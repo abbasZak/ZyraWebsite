@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
 import zyraLogo from "@/assets/zyra-logo.jpeg";
+import PresaleCountdown from "@/components/PresaleCountdown";
 
 const navLinks = [
   { label: "Features", href: "#features" },
@@ -30,11 +31,8 @@ const Navbar = () => {
               {link.label}
             </a>
           ))}
-          <a
-            href="#tokenomics"
-            className="px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary/90 transition-colors"
-          >
-            Join Presale
+          <a href="#tokenomics">
+            <PresaleCountdown compact />
           </a>
         </div>
 
@@ -58,12 +56,8 @@ const Navbar = () => {
               {link.label}
             </a>
           ))}
-          <a
-            href="#tokenomics"
-            className="block px-4 py-2 rounded-lg bg-primary text-primary-foreground text-sm font-semibold text-center"
-            onClick={() => setMobileOpen(false)}
-          >
-            Join Presale
+          <a href="#tokenomics" onClick={() => setMobileOpen(false)}>
+            <PresaleCountdown compact />
           </a>
         </div>
       )}

@@ -1,6 +1,7 @@
 import { motion } from "framer-motion";
-import { ArrowRight, FileText } from "lucide-react";
+import { FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import PresaleCountdown from "@/components/PresaleCountdown";
 
 const HeroSection = () => {
   return (
@@ -30,11 +31,13 @@ const HeroSection = () => {
             Zyra is a non-custodial DEX built for emerging markets. Trade directly from your wallet with lower fees, AI-powered tools, and community governance.
           </p>
 
+          <div className="mb-8">
+            <PresaleCountdown />
+          </div>
+
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Button size="lg" className="text-lg px-8 py-6 font-semibold" asChild>
-              <a href="#tokenomics">
-                Join Presale <ArrowRight className="ml-2 w-5 h-5" />
-              </a>
+              <a href="#tokenomics">View Tokenomics</a>
             </Button>
             <Button size="lg" variant="outline" className="text-lg px-8 py-6 font-semibold border-border" asChild>
               <a href="/whitepaper">
