@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Menu, X } from "lucide-react";
-import zyraLogo from "@/assets/zyra-logo.jpeg";
+import zyraLogo from "@/assets/zyra-logo.png";
 import PresaleCountdown from "@/components/PresaleCountdown";
 
 const navLinks = [
