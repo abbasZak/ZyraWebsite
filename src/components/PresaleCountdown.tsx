@@ -38,11 +38,13 @@ const PresaleCountdown = ({ compact = false }: Props) => {
 
   if (compact) {
     return (
-      <div className="flex items-center gap-1.5">
-        <span className="w-2 h-2 rounded-full bg-primary animate-pulse-glow" />
-        <span className="text-sm font-semibold text-primary">
-          {isLive ? "Presale Live" : "Presale in"}{" "}
-          {time.days}d {String(time.hours).padStart(2, "0")}:{String(time.minutes).padStart(2, "0")}:{String(time.seconds).padStart(2, "0")}
+      <div className="flex items-center gap-2">
+        <span className="relative flex h-2 w-2">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75" />
+          <span className="relative inline-flex rounded-full h-2 w-2 bg-primary" />
+        </span>
+        <span className="text-sm font-medium text-primary">
+          {isLive ? "Live" : `${time.days}d ${String(time.hours).padStart(2, "0")}:${String(time.minutes).padStart(2, "0")}:${String(time.seconds).padStart(2, "0")}`}
         </span>
       </div>
     );
@@ -50,16 +52,21 @@ const PresaleCountdown = ({ compact = false }: Props) => {
 
   return (
     <div className="text-center">
-      <p className="text-sm font-medium text-primary mb-3">
-        {isLive ? "🔥 Presale is LIVE — Ends in" : "⏳ Presale Starts in"}
+      <p className="text-xs font-medium text-muted-foreground uppercase tracking-[0.2em] mb-4">
+        {isLive ? "Presale is Live — Ends in" : "Presale Starts in"}
       </p>
-      <div className="flex gap-3 justify-center">
-        {units.map((u) => (
-          <div key={u.label} className="flex flex-col items-center">
-            <span className="text-2xl md:text-3xl font-bold text-foreground bg-card border border-border rounded-lg w-14 h-14 md:w-16 md:h-16 flex items-center justify-center">
-              {String(u.value).padStart(2, "0")}
-            </span>
-            <span className="text-xs text-muted-foreground mt-1">{u.label}</span>
+      <div className="flex gap-2 sm:gap-3 justify-center">
+        {units.map((u, i) => (
+          <div key={u.label} className="flex items-center gap-2 sm:gap-3">
+            <div className="flex flex-col items-center">
+              <span className="text-2xl sm:text-3xl md:text-4xl font-bold text-foreground font-display tabular-nums glass rounded-xl w-14 h-14 sm:w-16 sm:h-16 md:w-[4.5rem] md:h-[4.5rem] flex items-center justify-center gradient-border">
+                {String(u.value).padStart(2, "0")}
+              </span>
+              <span className="text-[10px] text-muted-foreground mt-1.5 uppercase tracking-widest">{u.label}</span>
+            </div>
+            {i < units.length - 1 && (
+              <span className="text-xl text-muted-foreground/30 font-light mb-5">:</span>
+            )}
           </div>
         ))}
       </div>

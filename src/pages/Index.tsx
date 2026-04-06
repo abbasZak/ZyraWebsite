@@ -17,18 +17,21 @@ const Index = () => {
   }, []);
 
   return (
-    <>
+    <div className="noise">
       <Preloader isLoading={isLoading} />
-      <div className={isLoading ? "opacity-0" : "opacity-100 transition-opacity duration-500"}>
+      <div className={isLoading ? "opacity-0" : "opacity-100 transition-opacity duration-700"}>
         <Navbar />
         <HeroSection />
-        <FeaturesSection />
-        <TokenomicsSection />
-        <RoadmapSection />
-        <TeamSection />
+        <div className="relative">
+          <div className="absolute inset-0 bg-grid pointer-events-none" />
+          <FeaturesSection />
+          <TokenomicsSection />
+          <RoadmapSection />
+          <TeamSection />
+        </div>
         <Footer />
       </div>
-    </>
+    </div>
   );
 };
 
