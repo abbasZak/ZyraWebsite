@@ -16,7 +16,7 @@ const Preloader = ({ isLoading }: PreloaderProps) => {
         >
           <div className="flex flex-col items-center gap-8">
             <motion.img
-              src={zyraPreloader}
+              src={zyraLogo}
               alt="Zyra"
               className="w-48 h-48 object-contain rounded-2xl"
               initial={{ scale: 0.8, opacity: 0 }}
