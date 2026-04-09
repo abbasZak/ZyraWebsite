@@ -338,7 +338,11 @@ const Swap = () => {
             )}
 
             {/* CTA */}
-            {!connected ? (
+            {!user ? (
+              <Button className="w-full mt-3 h-12 text-base font-semibold glow-sm" size="lg" onClick={() => navigate("/auth")}>
+                <LogIn className="w-4 h-4 mr-2" /> Sign In to Swap
+              </Button>
+            ) : !connected ? (
               <Button className="w-full mt-3 h-12 text-base font-semibold glow-sm" size="lg" onClick={() => setVisible(true)}>
                 Connect Wallet to Swap
               </Button>
