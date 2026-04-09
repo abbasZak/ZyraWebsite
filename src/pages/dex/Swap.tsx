@@ -317,6 +317,10 @@ const Swap = () => {
                   <span>Network Fee</span>
                   <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-primary" />~$0.002</span>
                 </div>
+                <div className="flex justify-between">
+                  <span>Platform Fee</span>
+                  <span className="text-foreground font-medium">0.01 SOL</span>
+                </div>
               </div>
             )}
 
