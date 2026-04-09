@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { FileText, ArrowDown } from "lucide-react";
+import { FileText, ArrowDown, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PresaleCountdown from "@/components/PresaleCountdown";
 

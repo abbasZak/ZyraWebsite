@@ -6,6 +6,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import Index from "./pages/Index.tsx";
 import Whitepaper from "./pages/Whitepaper.tsx";
 import NotFound from "./pages/NotFound.tsx";
+import Swap from "./pages/dex/Swap.tsx";
+import Trade from "./pages/dex/Trade.tsx";
+import Liquidity from "./pages/dex/Liquidity.tsx";
+import Staking from "./pages/dex/Staking.tsx";
+import Governance from "./pages/dex/Governance.tsx";
 
 const queryClient = new QueryClient();
 
