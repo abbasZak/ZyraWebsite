@@ -10,6 +10,7 @@ const navLinks = [
   { label: "Roadmap", href: "#roadmap" },
   { label: "Team", href: "#team" },
   { label: "Whitepaper", href: "/whitepaper" },
+  { label: "Launch DEX", href: "/dex" },
 ];
 
 const Navbar = () => {
