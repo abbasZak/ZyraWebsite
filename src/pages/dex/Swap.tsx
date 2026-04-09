@@ -152,7 +152,6 @@ const Swap = () => {
 
   const executeSwap = async () => {
     if (!connected || !publicKey || !signTransaction || !quoteData) return;
-    const sendTransaction = useWalletRef.current;
     setSwapState("swapping");
     setErrorMsg("");
 
