@@ -57,6 +57,7 @@ const tourSteps: TourStep[] = [
 ];
 
 const TOUR_STORAGE_KEY = "zyra_tour_completed";
+const NEW_SIGNUP_KEY = "zyra_new_signup";
 
 export const useOnboardingTour = () => {
   const [showTour, setShowTour] = useState(false);
@@ -65,10 +66,12 @@ export const useOnboardingTour = () => {
   const completeTour = useCallback(() => {
     setShowTour(false);
     localStorage.setItem(TOUR_STORAGE_KEY, "true");
+    localStorage.removeItem(NEW_SIGNUP_KEY);
   }, []);
 
+  // Only auto-show for brand new signups (not returning logins)
   const shouldShowTour = useCallback(() => {
-    return !localStorage.getItem(TOUR_STORAGE_KEY);
+    return !localStorage.getItem(TOUR_STORAGE_KEY) && localStorage.getItem(NEW_SIGNUP_KEY) === "true";
   }, []);
 
   return { showTour, startTour, completeTour, shouldShowTour };
