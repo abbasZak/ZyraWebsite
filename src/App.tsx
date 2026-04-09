@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import SolanaWalletProvider from "./components/dex/SolanaWalletProvider";
 import Index from "./pages/Index.tsx";
 import Whitepaper from "./pages/Whitepaper.tsx";
 import NotFound from "./pages/NotFound.tsx";
@@ -21,17 +22,19 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/whitepaper" element={<Whitepaper />} />
-          <Route path="/dex" element={<Swap />} />
-          <Route path="/dex/trade" element={<Trade />} />
-          <Route path="/dex/liquidity" element={<Liquidity />} />
-          <Route path="/dex/staking" element={<Staking />} />
-          <Route path="/dex/governance" element={<Governance />} />
-          <Route path="/dex/ai" element={<AIHub />} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <SolanaWalletProvider>
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/whitepaper" element={<Whitepaper />} />
+            <Route path="/dex" element={<Swap />} />
+            <Route path="/dex/trade" element={<Trade />} />
+            <Route path="/dex/liquidity" element={<Liquidity />} />
+            <Route path="/dex/staking" element={<Staking />} />
+            <Route path="/dex/governance" element={<Governance />} />
+            <Route path="/dex/ai" element={<AIHub />} />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </SolanaWalletProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>
