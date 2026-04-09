@@ -8,6 +8,14 @@ const tokens = [
   { symbol: "ZRA", name: "Zyra", price: 0.20, icon: "⚡" },
   { symbol: "USDC", name: "USD Coin", price: 1.00, icon: "💲" },
   { symbol: "USDT", name: "Tether", price: 1.00, icon: "💵" },
+  { symbol: "BONK", name: "Bonk", price: 0.0000234, icon: "🐕" },
+  { symbol: "RAY", name: "Raydium", price: 2.41, icon: "☀️" },
+  { symbol: "JUP", name: "Jupiter", price: 1.12, icon: "🪐" },
+  { symbol: "ORCA", name: "Orca", price: 4.18, icon: "🐋" },
+  { symbol: "PYTH", name: "Pyth Network", price: 0.38, icon: "🔮" },
+  { symbol: "WIF", name: "Dogwifhat", price: 1.85, icon: "🎩" },
+  { symbol: "JTO", name: "Jito", price: 3.24, icon: "⚙️" },
+  { symbol: "MNGO", name: "Mango", price: 0.042, icon: "🥭" },
 ];
 
 const Swap = () => {
@@ -53,10 +61,18 @@ const Swap = () => {
                   onChange={(e) => setFromAmount(e.target.value)}
                   className="flex-1 bg-transparent text-2xl font-bold outline-none placeholder:text-muted-foreground/30 w-0"
                 />
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary hover:bg-secondary/80 transition-colors shrink-0">
-                  <span>{fromToken.icon}</span>
-                  <span className="font-semibold text-sm">{fromToken.symbol}</span>
-                </button>
+                <select
+                  value={fromToken.symbol}
+                  onChange={(e) => {
+                    const t = tokens.find((tk) => tk.symbol === e.target.value);
+                    if (t && t.symbol !== toToken.symbol) setFromToken(t);
+                  }}
+                  className="appearance-none bg-secondary hover:bg-secondary/80 transition-colors px-3 py-1.5 rounded-full font-semibold text-sm cursor-pointer outline-none shrink-0"
+                >
+                  {tokens.map((t) => (
+                    <option key={t.symbol} value={t.symbol}>{t.icon} {t.symbol}</option>
+                  ))}
+                </select>
               </div>
               {fromAmount && (
                 <p className="text-xs text-muted-foreground mt-1">
@@ -89,10 +105,18 @@ const Swap = () => {
                   readOnly
                   className="flex-1 bg-transparent text-2xl font-bold outline-none placeholder:text-muted-foreground/30 w-0"
                 />
-                <button className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-secondary hover:bg-secondary/80 transition-colors shrink-0">
-                  <span>{toToken.icon}</span>
-                  <span className="font-semibold text-sm">{toToken.symbol}</span>
-                </button>
+                <select
+                  value={toToken.symbol}
+                  onChange={(e) => {
+                    const t = tokens.find((tk) => tk.symbol === e.target.value);
+                    if (t && t.symbol !== fromToken.symbol) setToToken(t);
+                  }}
+                  className="appearance-none bg-secondary hover:bg-secondary/80 transition-colors px-3 py-1.5 rounded-full font-semibold text-sm cursor-pointer outline-none shrink-0"
+                >
+                  {tokens.map((t) => (
+                    <option key={t.symbol} value={t.symbol}>{t.icon} {t.symbol}</option>
+                  ))}
+                </select>
               </div>
               {toAmount && (
                 <p className="text-xs text-muted-foreground mt-1">
