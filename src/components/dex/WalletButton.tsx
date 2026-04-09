@@ -1,4 +1,6 @@
-import { useState } from "react";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useCallback, useMemo } from "react";
 import { Wallet, ChevronDown, Copy, LogOut, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -8,56 +10,59 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-
-const wallets = [
-  { name: "Phantom", icon: "👻" },
-  { name: "Solflare", icon: "🔆" },
-  { name: "Backpack", icon: "🎒" },
-];
+import { useToast } from "@/hooks/use-toast";
 
 const WalletButton = () => {
-  const [connected, setConnected] = useState(false);
-  const [address, setAddress] = useState("");
-  const [dialogOpen, setDialogOpen] = useState(false);
+  const { publicKey, wallet, disconnect, connected, connecting } = useWallet();
+  const { setVisible } = useWalletModal();
+  const { toast } = useToast();
 
-  const connectWallet = (walletName: string) => {
-    // Simulated connection — in production, use @solana/wallet-adapter
-    const fakeAddr = "Zyra" + Math.random().toString(36).substring(2, 8) + "..." + Math.random().toString(36).substring(2, 6);
-    setAddress(fakeAddr);
-    setConnected(true);
-    setDialogOpen(false);
-  };
+  const base58 = useMemo(() => publicKey?.toBase58(), [publicKey]);
+  const displayAddress = useMemo(() => {
+    if (!base58) return "";
+    return base58.slice(0, 4) + "..." + base58.slice(-4);
+  }, [base58]);
 
-  const disconnect = () => {
-    setConnected(false);
-    setAddress("");
-  };
+  const copyAddress = useCallback(() => {
+    if (base58) {
+      navigator.clipboard.writeText(base58);
+      toast({ title: "Address copied", description: base58 });
+    }
+  }, [base58, toast]);
 
-  if (connected) {
+  const openExplorer = useCallback(() => {
+    if (base58) {
+      window.open(`https://solscan.io/account/${base58}?cluster=devnet`, "_blank");
+    }
+  }, [base58]);
+
+  const handleDisconnect = useCallback(async () => {
+    await disconnect();
+    toast({ title: "Wallet disconnected" });
+  }, [disconnect, toast]);
+
+  if (connected && base58) {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button variant="outline" size="sm" className="gap-2 border-primary/20 hover:border-primary/40 font-mono text-xs">
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            {address}
+            {wallet?.adapter.icon && (
+              <img src={wallet.adapter.icon} alt="" className="w-4 h-4" />
+            )}
+            {displayAddress}
             <ChevronDown className="w-3 h-3" />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48 glass-strong">
-          <DropdownMenuItem className="gap-2 text-xs cursor-pointer">
+          <DropdownMenuItem className="gap-2 text-xs cursor-pointer" onClick={copyAddress}>
             <Copy className="w-3 h-3" /> Copy Address
           </DropdownMenuItem>
-          <DropdownMenuItem className="gap-2 text-xs cursor-pointer">
+          <DropdownMenuItem className="gap-2 text-xs cursor-pointer" onClick={openExplorer}>
             <ExternalLink className="w-3 h-3" /> View on Solscan
           </DropdownMenuItem>
           <DropdownMenuSeparator />
-          <DropdownMenuItem className="gap-2 text-xs cursor-pointer text-destructive" onClick={disconnect}>
+          <DropdownMenuItem className="gap-2 text-xs cursor-pointer text-destructive" onClick={handleDisconnect}>
             <LogOut className="w-3 h-3" /> Disconnect
           </DropdownMenuItem>
         </DropdownMenuContent>
@@ -66,34 +71,15 @@ const WalletButton = () => {
   }
 
   return (
-    <>
-      <Button size="sm" className="gap-2 glow-sm" onClick={() => setDialogOpen(true)}>
-        <Wallet className="w-4 h-4" />
-        Connect Wallet
-      </Button>
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="glass-strong border-border/50 max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="text-center">Connect Wallet</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-2 pt-2">
-            {wallets.map((w) => (
-              <button
-                key={w.name}
-                onClick={() => connectWallet(w.name)}
-                className="w-full flex items-center gap-3 px-4 py-3 rounded-xl hover:bg-secondary/50 transition-colors text-left"
-              >
-                <span className="text-xl">{w.icon}</span>
-                <span className="font-medium text-sm">{w.name}</span>
-              </button>
-            ))}
-          </div>
-          <p className="text-[10px] text-muted-foreground text-center pt-2">
-            By connecting, you agree to Zyra's Terms of Service
-          </p>
-        </DialogContent>
-      </Dialog>
-    </>
+    <Button
+      size="sm"
+      className="gap-2 glow-sm"
+      onClick={() => setVisible(true)}
+      disabled={connecting}
+    >
+      <Wallet className="w-4 h-4" />
+      {connecting ? "Connecting..." : "Connect Wallet"}
+    </Button>
   );
 };
 
