@@ -66,6 +66,8 @@ const AuthPage = ({ onSuccess, onBack }: AuthPageProps) => {
       });
       setMode("login");
     } else {
+      // Mark as new user so the onboarding tour triggers after email confirmation
+      localStorage.setItem("zyra_new_signup", "true");
       toast({ title: "Check your email", description: "We sent you a confirmation link. Once confirmed you'll be taken to the DEX." });
     }
   };
