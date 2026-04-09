@@ -1,8 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { ArrowDownUp, Settings, Info, Zap, Loader2, CheckCircle2, AlertTriangle, RefreshCw } from "lucide-react";
+import { ArrowDownUp, Settings, Info, Zap, Loader2, CheckCircle2, AlertTriangle, RefreshCw, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import DexLayout from "@/components/dex/DexLayout";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useConnection } from "@solana/wallet-adapter-react";
