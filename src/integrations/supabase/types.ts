@@ -14,6 +14,122 @@ export type Database = {
   }
   public: {
     Tables: {
+      governance_proposals: {
+        Row: {
+          author_id: string
+          author_label: string
+          created_at: string
+          description: string | null
+          end_date: string
+          id: string
+          proposal_id: string
+          status: string
+          title: string
+          updated_at: string
+          votes_against: number
+          votes_for: number
+        }
+        Insert: {
+          author_id: string
+          author_label: string
+          created_at?: string
+          description?: string | null
+          end_date: string
+          id?: string
+          proposal_id: string
+          status?: string
+          title: string
+          updated_at?: string
+          votes_against?: number
+          votes_for?: number
+        }
+        Update: {
+          author_id?: string
+          author_label?: string
+          created_at?: string
+          description?: string | null
+          end_date?: string
+          id?: string
+          proposal_id?: string
+          status?: string
+          title?: string
+          updated_at?: string
+          votes_against?: number
+          votes_for?: number
+        }
+        Relationships: []
+      }
+      governance_votes: {
+        Row: {
+          created_at: string
+          id: string
+          proposal_id: string
+          user_id: string
+          vote_direction: string
+          voting_power: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          proposal_id: string
+          user_id: string
+          vote_direction: string
+          voting_power?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          proposal_id?: string
+          user_id?: string
+          vote_direction?: string
+          voting_power?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "governance_votes_proposal_id_fkey"
+            columns: ["proposal_id"]
+            isOneToOne: false
+            referencedRelation: "governance_proposals"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      liquidity_positions: {
+        Row: {
+          created_at: string
+          id: string
+          lp_tokens: number
+          pair: string
+          pool_share: number
+          token_a_amount: number
+          token_b_amount: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          lp_tokens?: number
+          pair: string
+          pool_share?: number
+          token_a_amount?: number
+          token_b_amount?: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          lp_tokens?: number
+          pair?: string
+          pool_share?: number
+          token_a_amount?: number
+          token_b_amount?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -39,6 +155,48 @@ export type Database = {
           created_at?: string
           display_name?: string | null
           id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      stakes: {
+        Row: {
+          amount: number
+          apr: number
+          created_at: string
+          duration_days: number
+          end_date: string
+          id: string
+          rewards_earned: number
+          start_date: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          amount: number
+          apr: number
+          created_at?: string
+          duration_days: number
+          end_date: string
+          id?: string
+          rewards_earned?: number
+          start_date?: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          amount?: number
+          apr?: number
+          created_at?: string
+          duration_days?: number
+          end_date?: string
+          id?: string
+          rewards_earned?: number
+          start_date?: string
+          status?: string
           updated_at?: string
           user_id?: string
         }
