@@ -6,6 +6,7 @@ import {
   Droplets,
   Coins,
   Vote,
+  Brain,
   Home,
   Menu,
   X,
@@ -19,6 +20,7 @@ const navItems = [
   { label: "Liquidity", href: "/dex/liquidity", icon: Droplets },
   { label: "Staking", href: "/dex/staking", icon: Coins },
   { label: "Governance", href: "/dex/governance", icon: Vote },
+  { label: "AI", href: "/dex/ai", icon: Brain },
 ];
 
 const DexLayout = ({ children }: { children: React.ReactNode }) => {

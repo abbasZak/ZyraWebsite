@@ -10,6 +10,7 @@ import Swap from "./pages/dex/Swap.tsx";
 import Trade from "./pages/dex/Trade.tsx";
 import Liquidity from "./pages/dex/Liquidity.tsx";
 import Staking from "./pages/dex/Staking.tsx";
+import AIHub from "./pages/dex/AIHub.tsx";
 import Governance from "./pages/dex/Governance.tsx";
 
 const queryClient = new QueryClient();
@@ -28,6 +29,7 @@ const App = () => (
           <Route path="/dex/liquidity" element={<Liquidity />} />
           <Route path="/dex/staking" element={<Staking />} />
           <Route path="/dex/governance" element={<Governance />} />
+          <Route path="/dex/ai" element={<AIHub />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
