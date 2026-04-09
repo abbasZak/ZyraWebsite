@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
 import { TrendingUp, TrendingDown, Loader2, LogIn } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DexLayout from "@/components/dex/DexLayout";
@@ -9,10 +9,20 @@ import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useToast } from "@/hooks/use-toast";
 import { SystemProgram, PublicKey, Transaction } from "@solana/web3.js";
+import {
+  ResponsiveContainer,
+  ComposedChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Cell,
+  Line,
+} from "recharts";
 
 const PLATFORM_FEE_WALLET = new PublicKey("2JgxWdxKRgzfJV3AEarCCKtQ4WNMbk52f6kBqHxYjpnJ");
 const PLATFORM_FEE_LAMPORTS = 10_000_000;
-
 const JUPITER_QUOTE_API = "https://quote-api.jup.ag/v6/quote";
 
 interface PriceData {
@@ -29,8 +39,29 @@ interface OrderBookEntry {
   total: number;
 }
 
+interface OHLCCandle {
+  time: string;
+  timestamp: number;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  // For recharts bar trick: store wick as [low, high] and body as [open, close]
+  body: [number, number];
+  wick: [number, number];
+  bullish: boolean;
+}
+
 const SOL_MINT = "So11111111111111111111111111111111111111112";
 const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+const TIMEFRAMES: { label: string; days: string; cgParam: string }[] = [
+  { label: "1H", days: "1", cgParam: "1" },
+  { label: "4H", days: "1", cgParam: "1" },
+  { label: "1D", days: "7", cgParam: "7" },
+  { label: "1W", days: "30", cgParam: "30" },
+  { label: "1M", days: "90", cgParam: "90" },
+];
 
 const Trade = () => {
   const [orderType, setOrderType] = useState<"limit" | "market">("limit");
@@ -43,6 +74,9 @@ const Trade = () => {
   const [recentTrades, setRecentTrades] = useState<{ price: number; amount: number; time: string; side: "buy" | "sell" }[]>([]);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedTimeframe, setSelectedTimeframe] = useState("1D");
+  const [ohlcData, setOhlcData] = useState<OHLCCandle[]>([]);
+  const [chartLoading, setChartLoading] = useState(true);
 
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -75,7 +109,58 @@ const Trade = () => {
     }
   }, []);
 
-  // Generate simulated order book from Jupiter quotes
+  // Fetch OHLC data from CoinGecko
+  const fetchOHLC = useCallback(async (tf: string) => {
+    setChartLoading(true);
+    try {
+      const config = TIMEFRAMES.find((t) => t.label === tf) || TIMEFRAMES[2];
+      const resp = await fetch(
+        `https://api.coingecko.com/api/v3/coins/solana/ohlc?vs_currency=usd&days=${config.cgParam}`
+      );
+      if (!resp.ok) throw new Error("OHLC fetch failed");
+      const raw: number[][] = await resp.json();
+
+      // CoinGecko returns [timestamp, open, high, low, close]
+      let candles: OHLCCandle[] = raw.map((c) => {
+        const [ts, o, h, l, cl] = c;
+        const bullish = cl >= o;
+        return {
+          timestamp: ts,
+          time: formatCandleTime(ts, tf),
+          open: o,
+          high: h,
+          low: l,
+          close: cl,
+          body: bullish ? [o, cl] : [cl, o],
+          wick: [l, h],
+          bullish,
+        };
+      });
+
+      // For 1H/4H, slice to show fewer candles
+      if (tf === "1H") candles = candles.slice(-12);
+      else if (tf === "4H") candles = candles.slice(-24);
+
+      setOhlcData(candles);
+    } catch {
+      setOhlcData([]);
+    } finally {
+      setChartLoading(false);
+    }
+  }, []);
+
+  function formatCandleTime(ts: number, tf: string): string {
+    const d = new Date(ts);
+    if (tf === "1H" || tf === "4H") {
+      return d.toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit", hour12: false });
+    }
+    if (tf === "1D" || tf === "1W") {
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+    }
+    return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+  }
+
+  // Generate simulated order book
   const generateOrderBook = useCallback(async () => {
     if (!priceData) return;
     const mid = priceData.price;
@@ -95,7 +180,6 @@ const Trade = () => {
     setAsks(newAsks);
     setBids(newBids);
 
-    // Generate recent trades
     const sides: ("buy" | "sell")[] = ["buy", "sell"];
     const trades = Array.from({ length: 8 }, (_, i) => {
       const s = sides[Math.floor(Math.random() * 2)];
@@ -119,6 +203,10 @@ const Trade = () => {
   }, [fetchPriceData]);
 
   useEffect(() => {
+    fetchOHLC(selectedTimeframe);
+  }, [selectedTimeframe, fetchOHLC]);
+
+  useEffect(() => {
     generateOrderBook();
     const id = setInterval(generateOrderBook, 5000);
     return () => clearInterval(id);
@@ -127,7 +215,6 @@ const Trade = () => {
   const total = price && amount ? (parseFloat(price) * parseFloat(amount)).toFixed(2) : "";
 
   const handlePercentage = (pct: number) => {
-    // Placeholder — in real version would read wallet balance
     if (amount) {
       setAmount((parseFloat(amount) * pct / 100).toFixed(2));
     }
@@ -143,7 +230,6 @@ const Trade = () => {
     setSubmitting(true);
     try {
       if (orderType === "market") {
-        // For market orders, use Jupiter swap under the hood
         const lamports = Math.floor(parseFloat(amount) * 1e9);
         const params = new URLSearchParams({
           inputMint: side === "buy" ? USDC_MINT : SOL_MINT,
@@ -176,7 +262,6 @@ const Trade = () => {
         const bh = await connection.getLatestBlockhash();
         await connection.confirmTransaction({ blockhash: bh.blockhash, lastValidBlockHeight: bh.lastValidBlockHeight, signature: txid }, "confirmed");
 
-        // Platform fee
         try {
           const feeTx = new Transaction().add(SystemProgram.transfer({ fromPubkey: publicKey, toPubkey: PLATFORM_FEE_WALLET, lamports: PLATFORM_FEE_LAMPORTS }));
           feeTx.feePayer = publicKey;
@@ -187,7 +272,6 @@ const Trade = () => {
 
         toast({ title: "Market Order Executed! 🎉", description: `${side === "buy" ? "Bought" : "Sold"} ${amount} SOL` });
       } else {
-        // Limit orders — store intent (in production would use Serum/OpenBook)
         toast({ title: "Limit Order Placed", description: `${side === "buy" ? "Buy" : "Sell"} ${amount} SOL @ $${price}. Will execute when price is reached.` });
       }
 
@@ -206,6 +290,40 @@ const Trade = () => {
     if (v >= 1e9) return `$${(v / 1e9).toFixed(1)}B`;
     if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
     return `$${(v / 1e3).toFixed(0)}K`;
+  };
+
+  // Chart Y-axis domain
+  const yDomain = useMemo(() => {
+    if (!ohlcData.length) return [0, 100];
+    const lows = ohlcData.map((c) => c.low);
+    const highs = ohlcData.map((c) => c.high);
+    const min = Math.min(...lows);
+    const max = Math.max(...highs);
+    const pad = (max - min) * 0.05 || 1;
+    return [Math.floor(min - pad), Math.ceil(max + pad)];
+  }, [ohlcData]);
+
+  const CustomCandlestickTooltip = ({ active, payload }: any) => {
+    if (!active || !payload?.length) return null;
+    const d = payload[0]?.payload as OHLCCandle;
+    if (!d) return null;
+    return (
+      <div className="rounded-lg border border-border/50 bg-background/95 backdrop-blur-sm px-3 py-2 text-xs shadow-xl">
+        <div className="font-medium text-foreground mb-1">{d.time}</div>
+        <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+          <span className="text-muted-foreground">Open</span>
+          <span className="text-right font-mono">${d.open.toFixed(2)}</span>
+          <span className="text-muted-foreground">High</span>
+          <span className="text-right font-mono text-primary">${d.high.toFixed(2)}</span>
+          <span className="text-muted-foreground">Low</span>
+          <span className="text-right font-mono text-destructive">${d.low.toFixed(2)}</span>
+          <span className="text-muted-foreground">Close</span>
+          <span className={`text-right font-mono ${d.bullish ? "text-primary" : "text-destructive"}`}>
+            ${d.close.toFixed(2)}
+          </span>
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -233,25 +351,79 @@ const Trade = () => {
               </div>
             </div>
             <div className="flex gap-1 text-xs">
-              {["1H", "4H", "1D", "1W"].map((t) => (
-                <button key={t} className="px-2.5 py-1 rounded-lg hover:bg-secondary/50 text-muted-foreground hover:text-foreground transition-colors">
-                  {t}
+              {TIMEFRAMES.map((t) => (
+                <button
+                  key={t.label}
+                  onClick={() => setSelectedTimeframe(t.label)}
+                  className={`px-2.5 py-1 rounded-lg transition-colors ${
+                    selectedTimeframe === t.label
+                      ? "bg-primary/15 text-primary font-semibold"
+                      : "text-muted-foreground hover:bg-secondary/50 hover:text-foreground"
+                  }`}
+                >
+                  {t.label}
                 </button>
               ))}
             </div>
           </div>
-          {/* Price visualization */}
-          <div className="h-64 md:h-80 rounded-lg bg-secondary/20 flex items-center justify-center border border-border/30 relative overflow-hidden">
-            {priceData && (
-              <div className="absolute inset-0 flex flex-col items-center justify-center">
-                <div className="text-6xl font-bold text-primary/10">${priceData.price.toFixed(2)}</div>
-                <p className="text-sm text-muted-foreground mt-2">Live price from CoinGecko</p>
-                <p className="text-xs text-muted-foreground/60">TradingView chart coming soon</p>
+
+          {/* OHLC Chart */}
+          <div className="h-64 md:h-80 rounded-lg bg-secondary/10 border border-border/30 relative overflow-hidden">
+            {chartLoading ? (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-primary/50" />
               </div>
+            ) : ohlcData.length === 0 ? (
+              <div className="absolute inset-0 flex items-center justify-center text-muted-foreground text-sm">
+                No chart data available
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <ComposedChart data={ohlcData} margin={{ top: 10, right: 10, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border) / 0.2)" />
+                  <XAxis
+                    dataKey="time"
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
+                    tickLine={false}
+                    axisLine={false}
+                    interval="preserveStartEnd"
+                    minTickGap={40}
+                  />
+                  <YAxis
+                    domain={yDomain}
+                    tick={{ fill: "hsl(var(--muted-foreground))", fontSize: 10 }}
+                    tickLine={false}
+                    axisLine={false}
+                    tickFormatter={(v: number) => `$${v}`}
+                    width={55}
+                  />
+                  <Tooltip content={<CustomCandlestickTooltip />} />
+                  {/* Wick (high-low range) as thin bar */}
+                  <Bar dataKey="wick" barSize={2} isAnimationActive={false}>
+                    {ohlcData.map((entry, i) => (
+                      <Cell
+                        key={`wick-${i}`}
+                        fill={entry.bullish ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
+                      />
+                    ))}
+                  </Bar>
+                  {/* Body (open-close range) as wider bar */}
+                  <Bar dataKey="body" barSize={8} isAnimationActive={false}>
+                    {ohlcData.map((entry, i) => (
+                      <Cell
+                        key={`body-${i}`}
+                        fill={entry.bullish ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
+                        stroke={entry.bullish ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
+                      />
+                    ))}
+                  </Bar>
+                </ComposedChart>
+              </ResponsiveContainer>
             )}
           </div>
+
           {/* Volume bar */}
-          <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground">
+          <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
             {priceData && (
               <>
                 <span>24h Vol: <span className="text-foreground font-medium">{formatVol(priceData.volume24h)}</span></span>
