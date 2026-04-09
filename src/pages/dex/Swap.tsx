@@ -3,7 +3,6 @@ import { ArrowDownUp, Settings, Info, Zap, Loader2, CheckCircle2, AlertTriangle,
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import DexLayout from "@/components/dex/DexLayout";
-import { supabase } from "@/integrations/supabase/client";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useConnection } from "@solana/wallet-adapter-react";
@@ -31,6 +30,9 @@ const tokens: Token[] = [
   { symbol: "PYTH", name: "Pyth Network", icon: "🔮", mint: "HZ1JovNiVvGrGNiiYvEozEVgZ58xaU3RKwX8eACQBCt3", decimals: 6, coingeckoId: "pyth-network" },
 ];
 
+const JUPITER_QUOTE_API = "https://quote-api.jup.ag/v6/quote";
+const JUPITER_SWAP_API = "https://quote-api.jup.ag/v6/swap";
+
 type SwapState = "idle" | "quoting" | "quoted" | "swapping" | "success" | "error";
 
 const Swap = () => {
@@ -52,7 +54,7 @@ const Swap = () => {
   const { connection } = useConnection();
   const { toast } = useToast();
 
-  // Fetch live prices from CoinGecko
+  // Fetch live prices
   useEffect(() => {
     const ids = tokens.filter(t => t.coingeckoId).map(t => t.coingeckoId).join(",");
     fetch(`https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currencies=usd`)
@@ -71,7 +73,7 @@ const Swap = () => {
 
   const getPrice = (symbol: string) => prices[symbol] || 0;
 
-  // Debounced quote fetching
+  // Fetch Jupiter quote directly
   const fetchQuote = useCallback(async (amount: string, from: Token, to: Token, slip: number) => {
     if (!amount || parseFloat(amount) <= 0) {
       setQuoteData(null);
@@ -88,34 +90,34 @@ const Swap = () => {
     const lamports = Math.floor(parseFloat(amount) * Math.pow(10, from.decimals));
 
     try {
-      const { data, error } = await supabase.functions.invoke("swap-quote", {
-        body: {
-          inputMint: from.mint,
-          outputMint: to.mint,
-          amount: lamports,
-          slippageBps: Math.round(slip * 100),
-        },
+      const params = new URLSearchParams({
+        inputMint: from.mint,
+        outputMint: to.mint,
+        amount: lamports.toString(),
+        slippageBps: Math.round(slip * 100).toString(),
       });
 
-      if (error || data?.error) {
-        setSwapState("error");
-        setErrorMsg(data?.error || error?.message || "Quote failed");
-        return;
+      const resp = await fetch(`${JUPITER_QUOTE_API}?${params}`);
+      if (!resp.ok) {
+        const errText = await resp.text();
+        throw new Error(errText || "Quote request failed");
       }
+
+      const data = await resp.json();
+      if (data.error) throw new Error(data.error);
 
       setQuoteData(data);
       const outAmt = parseInt(data.outAmount) / Math.pow(10, to.decimals);
       setOutputAmount(outAmt.toFixed(to.decimals <= 6 ? 6 : 4));
       setPriceImpact(data.priceImpactPct ? `${parseFloat(data.priceImpactPct).toFixed(3)}%` : "<0.001%");
-      
-      // Route info
+
       if (data.routePlan?.length) {
         const labels = data.routePlan.map((r: any) => r.swapInfo?.label || "").filter(Boolean);
         setRouteLabel(labels.join(" → ") || "Jupiter");
       } else {
         setRouteLabel("Jupiter Aggregator");
       }
-      
+
       setSwapState("quoted");
     } catch (e: any) {
       setSwapState("error");
@@ -123,7 +125,7 @@ const Swap = () => {
     }
   }, []);
 
-  // Debounce quote requests
+  // Debounce
   useEffect(() => {
     if (quoteTimer.current) clearTimeout(quoteTimer.current);
     quoteTimer.current = setTimeout(() => {
@@ -133,10 +135,8 @@ const Swap = () => {
   }, [fromAmount, fromToken, toToken, slippage, fetchQuote]);
 
   const flipTokens = () => {
-    const prevFrom = fromToken;
-    const prevTo = toToken;
-    setFromToken(prevTo);
-    setToToken(prevFrom);
+    setFromToken(toToken);
+    setToToken(fromToken);
     setFromAmount("");
     setQuoteData(null);
     setOutputAmount("");
@@ -145,36 +145,35 @@ const Swap = () => {
 
   const executeSwap = async () => {
     if (!connected || !publicKey || !signTransaction || !quoteData) return;
-
     setSwapState("swapping");
     setErrorMsg("");
 
     try {
-      // Get swap transaction from Jupiter via edge function
-      const { data, error } = await supabase.functions.invoke("swap-execute", {
-        body: {
+      const swapResp = await fetch(JUPITER_SWAP_API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
           quoteResponse: quoteData,
           userPublicKey: publicKey.toBase58(),
-        },
+          wrapAndUnwrapSol: true,
+          dynamicComputeUnitLimit: true,
+          prioritizationFeeLamports: "auto",
+        }),
       });
 
-      if (error || data?.error) {
-        throw new Error(data?.error || error?.message || "Failed to build transaction");
-      }
+      if (!swapResp.ok) throw new Error("Failed to build swap transaction");
 
-      // Deserialize and sign
-      const swapTxBuf = Buffer.from(data.swapTransaction, "base64");
+      const { swapTransaction } = await swapResp.json();
+      const swapTxBuf = Buffer.from(swapTransaction, "base64");
       const tx = VersionedTransaction.deserialize(swapTxBuf);
       const signedTx = await signTransaction(tx);
 
-      // Send transaction
       const rawTx = signedTx.serialize();
       const txid = await connection.sendRawTransaction(rawTx, {
         skipPreflight: true,
         maxRetries: 3,
       });
 
-      // Confirm
       const latestBlockhash = await connection.getLatestBlockhash();
       await connection.confirmTransaction({
         blockhash: latestBlockhash.blockhash,
@@ -188,14 +187,12 @@ const Swap = () => {
         description: `Swapped ${fromAmount} ${fromToken.symbol} for ${outputAmount} ${toToken.symbol}`,
       });
 
-      // Reset after delay
       setTimeout(() => {
         setFromAmount("");
         setOutputAmount("");
         setQuoteData(null);
         setSwapState("idle");
       }, 3000);
-
     } catch (e: any) {
       setSwapState("error");
       const msg = e.message || "Swap failed";
@@ -206,9 +203,7 @@ const Swap = () => {
 
   const fromUsd = fromAmount ? (parseFloat(fromAmount) * getPrice(fromToken.symbol)).toFixed(2) : "";
   const toUsd = outputAmount ? (parseFloat(outputAmount) * getPrice(toToken.symbol)).toFixed(2) : "";
-  const rate = outputAmount && fromAmount
-    ? (parseFloat(outputAmount) / parseFloat(fromAmount)).toFixed(6)
-    : null;
+  const rate = outputAmount && fromAmount ? (parseFloat(outputAmount) / parseFloat(fromAmount)).toFixed(6) : null;
 
   return (
     <DexLayout>
@@ -258,12 +253,9 @@ const Swap = () => {
               {fromUsd && <p className="text-xs text-muted-foreground mt-1">≈ ${fromUsd}</p>}
             </div>
 
-            {/* Flip button */}
+            {/* Flip */}
             <div className="flex justify-center -my-3 relative z-10">
-              <button
-                onClick={flipTokens}
-                className="w-9 h-9 rounded-xl bg-secondary border-2 border-background flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-colors"
-              >
+              <button onClick={flipTokens} className="w-9 h-9 rounded-xl bg-secondary border-2 border-background flex items-center justify-center hover:bg-primary/10 hover:text-primary transition-colors">
                 <ArrowDownUp className="w-4 h-4" />
               </button>
             </div>
@@ -279,13 +271,7 @@ const Swap = () => {
                   {swapState === "quoting" ? (
                     <Loader2 className="w-5 h-5 animate-spin text-primary" />
                   ) : (
-                    <input
-                      type="text"
-                      placeholder="0.00"
-                      value={outputAmount}
-                      readOnly
-                      className="flex-1 bg-transparent text-2xl font-bold outline-none placeholder:text-muted-foreground/30 w-0"
-                    />
+                    <input type="text" placeholder="0.00" value={outputAmount} readOnly className="flex-1 bg-transparent text-2xl font-bold outline-none placeholder:text-muted-foreground/30 w-0" />
                   )}
                 </div>
                 <select
@@ -330,7 +316,6 @@ const Swap = () => {
               </div>
             )}
 
-            {/* Error state */}
             {swapState === "error" && errorMsg && (
               <div className="pt-3 flex items-center gap-2 text-xs text-destructive">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
@@ -341,7 +326,6 @@ const Swap = () => {
               </div>
             )}
 
-            {/* Success state */}
             {swapState === "success" && (
               <div className="pt-3 flex items-center gap-2 text-xs text-primary">
                 <CheckCircle2 className="w-4 h-4" />
@@ -351,11 +335,7 @@ const Swap = () => {
 
             {/* CTA */}
             {!connected ? (
-              <Button
-                className="w-full mt-3 h-12 text-base font-semibold glow-sm"
-                size="lg"
-                onClick={() => setVisible(true)}
-              >
+              <Button className="w-full mt-3 h-12 text-base font-semibold glow-sm" size="lg" onClick={() => setVisible(true)}>
                 Connect Wallet to Swap
               </Button>
             ) : (
@@ -382,25 +362,21 @@ const Swap = () => {
             )}
           </div>
 
-          {/* Slippage selector */}
+          {/* Slippage */}
           <div className="mt-3 flex items-center gap-2 justify-center">
             <span className="text-xs text-muted-foreground">Slippage:</span>
             {[0.1, 0.5, 1.0, 3.0].map((s) => (
               <button
                 key={s}
                 onClick={() => setSlippage(s)}
-                className={`text-xs px-2.5 py-1 rounded-lg transition-colors ${
-                  slippage === s
-                    ? "bg-primary/10 text-primary font-medium"
-                    : "text-muted-foreground hover:bg-secondary/50"
-                }`}
+                className={`text-xs px-2.5 py-1 rounded-lg transition-colors ${slippage === s ? "bg-primary/10 text-primary font-medium" : "text-muted-foreground hover:bg-secondary/50"}`}
               >
                 {s}%
               </button>
             ))}
           </div>
 
-          {/* Live prices ticker */}
+          {/* Live prices */}
           {Object.keys(prices).length > 0 && (
             <div className="mt-4 glass rounded-xl p-3">
               <p className="text-[10px] text-muted-foreground mb-2 flex items-center gap-1">
