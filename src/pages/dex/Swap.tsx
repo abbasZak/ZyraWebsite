@@ -55,6 +55,8 @@ const Swap = () => {
   const { setVisible } = useWalletModal();
   const { connection } = useConnection();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   // Fetch live prices
   useEffect(() => {
