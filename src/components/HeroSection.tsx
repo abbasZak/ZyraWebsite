@@ -85,6 +85,17 @@ const HeroSection = () => {
               className="text-base px-8 h-12 font-semibold glow-sm hover:glow-md transition-shadow"
               asChild
             >
+              <a href="/dex">
+                <Rocket className="mr-2 w-4 h-4" />
+                Launch DEX
+              </a>
+            </Button>
+            <Button
+              size="lg"
+              variant="outline"
+              className="text-base px-8 h-12 font-semibold border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all"
+              asChild
+            >
               <a href="#tokenomics">View Tokenomics</a>
             </Button>
             <Button

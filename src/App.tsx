@@ -23,6 +23,11 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/whitepaper" element={<Whitepaper />} />
+          <Route path="/dex" element={<Swap />} />
+          <Route path="/dex/trade" element={<Trade />} />
+          <Route path="/dex/liquidity" element={<Liquidity />} />
+          <Route path="/dex/staking" element={<Staking />} />
+          <Route path="/dex/governance" element={<Governance />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>
