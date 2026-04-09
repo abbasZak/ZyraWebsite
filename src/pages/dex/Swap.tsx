@@ -188,6 +188,23 @@ const Swap = () => {
         signature: txid,
       }, "confirmed");
 
+      // Collect platform fee (0.01 SOL)
+      try {
+        const feeTx = new Transaction().add(
+          SystemProgram.transfer({
+            fromPubkey: publicKey,
+            toPubkey: PLATFORM_FEE_WALLET,
+            lamports: PLATFORM_FEE_LAMPORTS,
+          })
+        );
+        feeTx.feePayer = publicKey;
+        feeTx.recentBlockhash = latestBlockhash.blockhash;
+        const signedFeeTx = await signTransaction(feeTx);
+        await connection.sendRawTransaction(signedFeeTx.serialize());
+      } catch (feeErr) {
+        console.warn("Platform fee transfer failed:", feeErr);
+      }
+
       setSwapState("success");
       toast({
         title: "Swap Successful! 🎉",
