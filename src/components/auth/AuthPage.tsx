@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "./AuthProvider";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
@@ -17,6 +19,15 @@ const AuthPage = ({ onSuccess, onBack }: AuthPageProps) => {
   const [displayName, setDisplayName] = useState("");
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+
+  // If already authenticated, redirect to DEX
+  useEffect(() => {
+    if (!authLoading && user) {
+      navigate("/dex", { replace: true });
+    }
+  }, [user, authLoading, navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,25 +39,34 @@ const AuthPage = ({ onSuccess, onBack }: AuthPageProps) => {
     } else {
       toast({ title: "Welcome back! ⚡" });
       onSuccess?.();
+      navigate("/dex", { replace: true });
     }
   };
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: window.location.origin,
+        emailRedirectTo: `${window.location.origin}/dex`,
         data: { full_name: displayName || email },
       },
     });
     setLoading(false);
     if (error) {
       toast({ title: "Signup failed", description: error.message, variant: "destructive" });
+    } else if (data.user && data.user.identities && data.user.identities.length === 0) {
+      // Email already registered
+      toast({
+        title: "Email already in use",
+        description: "An account with this email already exists. Please sign in instead.",
+        variant: "destructive",
+      });
+      setMode("login");
     } else {
-      toast({ title: "Check your email", description: "We sent you a confirmation link." });
+      toast({ title: "Check your email", description: "We sent you a confirmation link. Once confirmed you'll be taken to the DEX." });
     }
   };
 
@@ -63,6 +83,9 @@ const AuthPage = ({ onSuccess, onBack }: AuthPageProps) => {
       toast({ title: "Check your email", description: "Password reset link sent." });
     }
   };
+
+  // Don't render form if already logged in
+  if (!authLoading && user) return null;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-4">
