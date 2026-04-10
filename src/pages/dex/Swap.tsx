@@ -368,7 +368,7 @@ const Swap = () => {
                 <LogIn className="w-4 h-4 mr-2" /> Sign In to Swap
               </Button>
             ) : !connected ? (
-              <Button className="w-full mt-3 h-12 text-base font-semibold glow-sm" size="lg" onClick={() => void openWalletConnect()}>
+              <Button className="w-full mt-3 h-12 text-base font-semibold glow-sm" size="lg" onClick={() => openWalletModal(true)}>
                 Connect Wallet to Swap
               </Button>
             ) : (

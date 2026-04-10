@@ -278,7 +278,7 @@ const Staking = () => {
                       <LogIn className="w-3.5 h-3.5 mr-1.5" /> Sign In to Stake
                     </Button>
                   ) : !connected ? (
-                    <Button className="w-full glow-sm rounded-xl h-11" onClick={() => void openWalletConnect()}>
+                    <Button className="w-full glow-sm rounded-xl h-11" onClick={() => openWalletModal(true)}>
                       Connect Wallet
                     </Button>
                   ) : (

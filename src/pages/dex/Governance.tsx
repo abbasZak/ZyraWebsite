@@ -173,7 +173,7 @@ const Governance = () => {
               <LogIn className="w-3.5 h-3.5" /> Sign In
             </Button>
           ) : (
-            <Button size="sm" className="gap-1.5 glow-sm rounded-xl" onClick={() => void openWalletConnect()}>
+            <Button size="sm" className="gap-1.5 glow-sm rounded-xl" onClick={() => openWalletModal(true)}>
               Connect Wallet
             </Button>
           )}
