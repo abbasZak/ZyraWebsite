@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { Droplets, Plus, TrendingUp, Loader2, LogIn, X, RefreshCw, ArrowRight, Wallet, BarChart3, Zap } from "lucide-react";
+import { Droplets, Plus, TrendingUp, Loader2, LogIn, X, RefreshCw, ArrowRight, Wallet, BarChart3, Zap, Brain, AlertTriangle, Shield, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DexLayout from "@/components/dex/DexLayout";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -62,6 +62,117 @@ const fmt = (n: number, prefix = "$") => {
   if (n >= 1_000_000) return `${prefix}${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `${prefix}${(n / 1_000).toFixed(1)}K`;
   return `${prefix}${n.toFixed(2)}`;
+};
+
+/* ── AI Liquidity Advisor Widget ── */
+const AILiquidityAdvisor = () => {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchAdvice = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: result, error: fnError } = await supabase.functions.invoke("ai-hub", {
+        body: { tool: "liquidity_advisor" },
+      });
+      if (fnError) throw new Error(fnError.message);
+      if (result?.error) throw new Error(result.error);
+      setData(result);
+    } catch (e: any) {
+      setError(e?.message || "AI advisor unavailable");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchAdvice(); }, [fetchAdvice]);
+
+  if (loading) return (
+    <div className="glass rounded-xl p-4 gradient-border mb-6">
+      <div className="flex items-center gap-2 mb-3">
+        <Brain className="w-4 h-4 text-primary animate-pulse" />
+        <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">AI Liquidity Advisor</span>
+      </div>
+      <div className="flex items-center justify-center py-6 gap-2">
+        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+        <span className="text-xs text-muted-foreground">Analyzing pools...</span>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="glass rounded-xl p-4 gradient-border mb-6">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Brain className="w-4 h-4 text-destructive" />
+          <span className="text-xs font-bold">AI Liquidity Advisor</span>
+        </div>
+        <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={fetchAdvice}><RefreshCw className="w-3 h-3" /></Button>
+      </div>
+      <p className="text-xs text-destructive">{error}</p>
+    </div>
+  );
+
+  if (!data) return null;
+
+  return (
+    <div className="glass rounded-xl gradient-border overflow-hidden mb-6">
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Brain className="w-4 h-4 text-primary" />
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">AI Liquidity Advisor</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          </div>
+          <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1" onClick={fetchAdvice}>
+            <RefreshCw className="w-3 h-3" />
+          </Button>
+        </div>
+
+        {data.summary && (
+          <p className="text-xs text-muted-foreground mb-3 bg-secondary/20 rounded-lg p-2.5 leading-relaxed">
+            <Sparkles className="w-3 h-3 text-primary inline mr-1" />{data.summary}
+          </p>
+        )}
+
+        {data.bestPools?.length > 0 && (
+          <div className="space-y-2 mb-3">
+            {data.bestPools.map((p: any, i: number) => (
+              <div key={i} className="flex items-center justify-between text-[11px] bg-secondary/10 rounded-lg p-2.5">
+                <div>
+                  <span className="font-bold text-foreground">{p.pool}</span>
+                  <span className="text-muted-foreground ml-2">APR: {p.apr}%</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                    p.recommendation === "Add" ? "bg-primary/15 text-primary border border-primary/20" :
+                    p.recommendation === "Remove" ? "bg-destructive/15 text-destructive border border-destructive/20" :
+                    "bg-amber-500/15 text-amber-400 border border-amber-500/20"
+                  }`}>{p.recommendation}</span>
+                  <span className={`text-[10px] font-bold ${p.risk === "Low" ? "text-primary" : p.risk === "High" ? "text-red-400" : "text-amber-400"}`}>
+                    IL: {p.impermanentLossRisk}
+                  </span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {data.warnings?.length > 0 && (
+          <div className="space-y-1.5">
+            {data.warnings.map((w: any, i: number) => (
+              <div key={i} className="flex items-start gap-2 text-[11px] text-muted-foreground">
+                <AlertTriangle className={`w-3 h-3 shrink-0 mt-0.5 ${w.severity === "High" ? "text-red-400" : "text-amber-400"}`} />
+                <span>{w.warning}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
 };
 
 /* ── Component ─────────────────────────────────────────── */

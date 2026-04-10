@@ -672,7 +672,13 @@ const Trade = () => {
         </div>
 
         {/* Recent trades */}
-        <div className="lg:col-span-12 glass rounded-xl p-4 gradient-border">
+        {/* AI Trade Advisor */}
+        <div className="lg:col-span-4">
+          <AITradeAdvisor />
+        </div>
+
+        {/* Recent trades */}
+        <div className="lg:col-span-8 glass rounded-xl p-4 gradient-border">
           <h3 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3">Recent Trades</h3>
           <div className="overflow-x-auto">
             <table className="w-full text-xs">
