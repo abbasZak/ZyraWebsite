@@ -1,19 +1,22 @@
 import { PublicKey, Transaction, Connection } from "@solana/web3.js";
-import {
-  getAssociatedTokenAddress,
-  createTransferInstruction,
-  createAssociatedTokenAccountInstruction,
-  getAccount,
-  TokenAccountNotFoundError,
-  TokenInvalidAccountOwnerError,
-} from "@solana/spl-token";
 
 export const ZRA_MINT = new PublicKey("3Jz9qH8kB8EyJJu8W1Mj5AS4GX54xJFfcnNNuWZ35bZE");
 export const ZRA_DECIMALS = 9;
 
 // Treasury/vault wallet for staking & liquidity deposits
-// In production, replace with a proper program-derived address (PDA)
 export const ZRA_VAULT = new PublicKey("2JgxWdxKRgzfJV3AEarCCKtQ4WNMbk52f6kBqHxYjpnJ");
+
+/**
+ * Dynamically import @solana/spl-token to avoid top-level Buffer issues
+ */
+async function getSplToken() {
+  // Ensure Buffer is available
+  if (typeof globalThis.Buffer === "undefined") {
+    const { Buffer } = await import("buffer");
+    globalThis.Buffer = Buffer;
+  }
+  return await import("@solana/spl-token");
+}
 
 /**
  * Get the ZRA token balance for a wallet
@@ -23,14 +26,17 @@ export async function getZraBalance(
   walletPubkey: PublicKey
 ): Promise<number> {
   try {
+    const { getAssociatedTokenAddress, getAccount, TokenAccountNotFoundError, TokenInvalidAccountOwnerError } = await getSplToken();
     const ata = await getAssociatedTokenAddress(ZRA_MINT, walletPubkey);
     const account = await getAccount(connection, ata);
     return Number(account.amount) / Math.pow(10, ZRA_DECIMALS);
-  } catch (e) {
-    if (e instanceof TokenAccountNotFoundError || e instanceof TokenInvalidAccountOwnerError) {
+  } catch (e: any) {
+    // Check by name since instanceof may not work across dynamic imports
+    if (e?.name === "TokenAccountNotFoundError" || e?.name === "TokenInvalidAccountOwnerError") {
       return 0;
     }
-    throw e;
+    console.error("Failed to get ZRA balance:", e);
+    return 0;
   }
 }
 
@@ -42,6 +48,8 @@ export async function buildZraTransferTx(
   fromPubkey: PublicKey,
   amount: number
 ): Promise<Transaction> {
+  const { getAssociatedTokenAddress, getAccount, createAssociatedTokenAccountInstruction, createTransferInstruction } = await getSplToken();
+
   const lamports = BigInt(Math.floor(amount * Math.pow(10, ZRA_DECIMALS)));
 
   const fromAta = await getAssociatedTokenAddress(ZRA_MINT, fromPubkey);
@@ -52,11 +60,11 @@ export async function buildZraTransferTx(
   // Create vault ATA if it doesn't exist
   try {
     await getAccount(connection, toAta);
-  } catch (e) {
-    if (e instanceof TokenAccountNotFoundError || e instanceof TokenInvalidAccountOwnerError) {
+  } catch (e: any) {
+    if (e?.name === "TokenAccountNotFoundError" || e?.name === "TokenInvalidAccountOwnerError") {
       tx.add(
         createAssociatedTokenAccountInstruction(
-          fromPubkey, // payer
+          fromPubkey,
           toAta,
           ZRA_VAULT,
           ZRA_MINT
