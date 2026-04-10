@@ -274,14 +274,12 @@ const TradingAssistantPanel = () => {
 /* ── SECURITY & OPTIMIZATION PANEL ── */
 
 const SecurityOptimizationPanel = () => {
-  const liquidity = useAITool("liquidity");
   const fraud = useAITool("fraud");
   const risk = useAITool("risk");
 
-  const anyLoading = liquidity.loading || fraud.loading || risk.loading;
+  const anyLoading = fraud.loading || risk.loading;
 
   const refreshAll = () => {
-    liquidity.refresh();
     fraud.refresh();
     risk.refresh();
   };
@@ -294,7 +292,7 @@ const SecurityOptimizationPanel = () => {
             <Shield className="w-5 h-5 text-amber-400" />
           </div>
           <div>
-            <h2 className="text-lg font-display font-bold">Security & Optimization</h2>
+            <h2 className="text-lg font-display font-bold">Security & Risk Monitor</h2>
             <div className="flex items-center gap-2 mt-0.5">
               <Radio className="w-3 h-3 text-primary animate-pulse" />
               <span className="text-[10px] text-primary font-semibold">Monitoring Active</span>
@@ -306,70 +304,11 @@ const SecurityOptimizationPanel = () => {
         </Button>
       </div>
 
-      <Tabs defaultValue="liquidity" className="w-full">
-        <TabsList className="w-full grid grid-cols-3 mb-4 bg-secondary/30 rounded-xl p-1">
-          <TabsTrigger value="liquidity" className="text-xs gap-1.5 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md"><Droplets className="w-3 h-3" />Liquidity</TabsTrigger>
-          <TabsTrigger value="fraud" className="text-xs gap-1.5 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md"><Shield className="w-3 h-3" />Fraud</TabsTrigger>
-          <TabsTrigger value="risk" className="text-xs gap-1.5 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md"><Gauge className="w-3 h-3" />Risk</TabsTrigger>
+      <Tabs defaultValue="fraud" className="w-full">
+        <TabsList className="w-full grid grid-cols-2 mb-4 bg-secondary/30 rounded-xl p-1">
+          <TabsTrigger value="fraud" className="text-xs gap-1.5 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md"><Shield className="w-3 h-3" />Fraud Detection</TabsTrigger>
+          <TabsTrigger value="risk" className="text-xs gap-1.5 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-md"><Gauge className="w-3 h-3" />Risk Assessment</TabsTrigger>
         </TabsList>
-
-        {/* Liquidity Tab */}
-        <TabsContent value="liquidity">
-          {liquidity.loading ? <LoadingState message="Optimizing liquidity allocations..." /> :
-           liquidity.error ? <ErrorState error={liquidity.error} onRetry={() => liquidity.refresh()} /> :
-           liquidity.data ? (
-            <div className="space-y-4 animate-fade-in">
-              <SectionCard>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs">
-                    <thead>
-                      <tr className="border-b border-border/30 text-muted-foreground">
-                        <th className="text-left py-3.5 px-4 font-semibold">Pool</th>
-                        <th className="text-right py-3.5 px-4 font-semibold">APR</th>
-                        <th className="text-right py-3.5 px-4 font-semibold hidden sm:table-cell">Current</th>
-                        <th className="text-right py-3.5 px-4 font-semibold">Optimal</th>
-                        <th className="text-right py-3.5 px-4 font-semibold">Action</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {(liquidity.data.pools || []).map((p: any) => (
-                        <tr key={p.pool} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
-                          <td className="py-3.5 px-4 font-bold">{p.pool}</td>
-                          <td className="text-right py-3.5 px-4 text-primary font-bold">{p.currentAPR}%</td>
-                          <td className="text-right py-3.5 px-4 text-muted-foreground hidden sm:table-cell">{p.currentAlloc}%</td>
-                          <td className="text-right py-3.5 px-4 font-bold">{p.optimalAlloc}%</td>
-                          <td className="text-right py-3.5 px-4">
-                            <span className={`text-[10px] font-bold px-2.5 py-1 rounded-full ${p.action === "Increase" ? "bg-primary/15 text-primary border border-primary/20" : p.action === "Decrease" ? "bg-amber-500/15 text-amber-400 border border-amber-500/20" : "bg-muted text-muted-foreground border border-border/30"}`}>
-                              {p.action}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </SectionCard>
-              {liquidity.data.summary && (
-                <div className="grid grid-cols-2 gap-3">
-                  <SectionCard>
-                    <div className="p-4 text-center bg-gradient-to-br from-blue-500/5 to-transparent">
-                      <Target className="w-5 h-5 text-blue-400 mx-auto mb-2" />
-                      <p className="text-2xl font-bold text-blue-400">{liquidity.data.summary.estimatedSlippageReduction || "N/A"}</p>
-                      <p className="text-[10px] text-muted-foreground mt-1">Slippage Reduction</p>
-                    </div>
-                  </SectionCard>
-                  <SectionCard>
-                    <div className="p-4 text-center bg-gradient-to-br from-primary/5 to-transparent">
-                      <Flame className="w-5 h-5 text-primary mx-auto mb-2" />
-                      <p className="text-2xl font-bold text-gradient">+{liquidity.data.summary.projectedAPRGain || "N/A"}</p>
-                      <p className="text-[10px] text-muted-foreground mt-1">APR Gain</p>
-                    </div>
-                  </SectionCard>
-                </div>
-              )}
-            </div>
-          ) : null}
-        </TabsContent>
 
         {/* Fraud Tab */}
         <TabsContent value="fraud">
