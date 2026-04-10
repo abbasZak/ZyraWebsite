@@ -5,172 +5,84 @@ import {
   useEffect,
   useMemo,
   useRef,
+  useState,
   type ReactNode,
 } from "react";
 import { WalletReadyState, type WalletName } from "@solana/wallet-adapter-base";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import WalletSelectModal from "./WalletSelectModal";
 
 const PHANTOM_WALLET_NAME = "Phantom" as WalletName<"Phantom">;
-const PHANTOM_AUTOCONNECT_PARAM = "phantomAutoConnect";
+const AUTOCONNECT_PARAM = "walletAutoConnect";
 
 type DexWalletConnectContextValue = {
-  openWalletConnect: () => Promise<void>;
+  openWalletConnect: () => void;
 };
 
 const DexWalletConnectContext = createContext<DexWalletConnectContextValue | null>(null);
 
 const isBrowser = () => typeof window !== "undefined";
 
-const getUserAgent = () => (isBrowser() ? window.navigator.userAgent ?? "" : "");
-
-const isMobileBrowser = () => /Android|iPhone|iPad|iPod|Mobile/i.test(getUserAgent());
-
-const isInjectedPhantom = () => {
+const isInsideWalletBrowser = () => {
   if (!isBrowser()) return false;
-
-  const phantomWindow = window as Window & {
-    phantom?: { solana?: { isPhantom?: boolean } };
-    solana?: { isPhantom?: boolean };
-  };
-
-  return Boolean(
-    phantomWindow.phantom?.solana?.isPhantom || phantomWindow.solana?.isPhantom
-  );
+  const w = window as any;
+  const ua = navigator.userAgent;
+  return Boolean(w.phantom?.solana?.isPhantom || w.solana?.isPhantom) || /Phantom|Solflare/i.test(ua);
 };
-
-const isInsidePhantomBrowser = () => isInjectedPhantom() || /Phantom/i.test(getUserAgent());
 
 const isWalletReady = (readyState?: WalletReadyState) =>
   readyState === WalletReadyState.Installed || readyState === WalletReadyState.Loadable;
 
-const hasPhantomAutoConnectParam = () => {
-  if (!isBrowser()) return false;
-  return new URL(window.location.href).searchParams.get(PHANTOM_AUTOCONNECT_PARAM) === "1";
-};
-
-const clearPhantomAutoConnectParam = () => {
-  if (!isBrowser()) return;
-
-  const url = new URL(window.location.href);
-  if (!url.searchParams.has(PHANTOM_AUTOCONNECT_PARAM)) return;
-
-  url.searchParams.delete(PHANTOM_AUTOCONNECT_PARAM);
-  window.history.replaceState({}, "", url.toString());
-};
-
-const buildPhantomReturnUrl = () => {
-  const url = new URL(window.location.href);
-  url.searchParams.set(PHANTOM_AUTOCONNECT_PARAM, "1");
-  return url.toString();
-};
-
-const buildPhantomUniversalLink = () => {
-  const returnUrl = encodeURIComponent(buildPhantomReturnUrl());
-  const ref = encodeURIComponent(window.location.origin);
-  return `https://phantom.app/ul/browse/${returnUrl}?ref=${ref}`;
-};
-
 export const DexWalletConnectProvider = ({ children }: { children: ReactNode }) => {
   const { wallets, wallet, connected, connecting, select, connect } = useWallet();
-  const { setVisible } = useWalletModal();
-  const pendingConnectRef = useRef(false);
+  const [modalOpen, setModalOpen] = useState(false);
   const connectAttemptedRef = useRef(false);
 
-  const phantomReadyState = useMemo(
-    () => wallets.find(({ adapter }) => adapter.name === PHANTOM_WALLET_NAME)?.readyState,
-    [wallets]
-  );
-
+  // Auto-connect when inside a wallet's in-app browser
   useEffect(() => {
-    if (!connected) return;
+    if (connected || connecting || !isInsideWalletBrowser()) return;
 
-    pendingConnectRef.current = false;
-    connectAttemptedRef.current = false;
-    clearPhantomAutoConnectParam();
-  }, [connected]);
+    // Find the first ready wallet
+    const readyWallet = wallets.find((w) => isWalletReady(w.readyState));
+    if (!readyWallet) return;
 
-  useEffect(() => {
-    const wantsPhantomConnect = pendingConnectRef.current || hasPhantomAutoConnectParam();
-
-    if (
-      !wantsPhantomConnect ||
-      connected ||
-      connecting ||
-      !isInsidePhantomBrowser() ||
-      !isWalletReady(phantomReadyState)
-    ) {
-      return;
-    }
-
-    if (wallet?.adapter.name !== PHANTOM_WALLET_NAME) {
-      select(PHANTOM_WALLET_NAME);
+    if (wallet?.adapter.name !== readyWallet.adapter.name) {
+      select(readyWallet.adapter.name as WalletName);
       return;
     }
 
     if (connectAttemptedRef.current) return;
     connectAttemptedRef.current = true;
 
-    void connect().catch((error) => {
-      console.error("Phantom connection failed:", error);
-      pendingConnectRef.current = false;
+    void connect().catch((err) => {
+      console.error("Auto-connect failed:", err);
       connectAttemptedRef.current = false;
-      clearPhantomAutoConnectParam();
     });
-  }, [connected, connecting, connect, phantomReadyState, select, wallet?.adapter.name]);
+  }, [connected, connecting, connect, wallets, select, wallet?.adapter.name]);
 
-  const openWalletConnect = useCallback(async () => {
+  useEffect(() => {
+    if (connected) connectAttemptedRef.current = false;
+  }, [connected]);
+
+  const openWalletConnect = useCallback(() => {
     if (connected || connecting) return;
+    setModalOpen(true);
+  }, [connected, connecting]);
 
-    if (isMobileBrowser() && !isInsidePhantomBrowser()) {
-      window.location.href = buildPhantomUniversalLink();
-      return;
-    }
-
-    if (isInsidePhantomBrowser()) {
-      pendingConnectRef.current = true;
-      connectAttemptedRef.current = false;
-
-      if (wallet?.adapter.name !== PHANTOM_WALLET_NAME) {
-        select(PHANTOM_WALLET_NAME);
-        return;
-      }
-
-      if (isWalletReady(phantomReadyState)) {
-        try {
-          await connect();
-        } catch (error) {
-          console.error("Phantom connection failed:", error);
-          pendingConnectRef.current = false;
-          connectAttemptedRef.current = false;
-          clearPhantomAutoConnectParam();
-        }
-      }
-
-      return;
-    }
-
-    setVisible(true);
-  }, [connected, connecting, connect, phantomReadyState, select, setVisible, wallet?.adapter.name]);
-
-  const value = useMemo(
-    () => ({ openWalletConnect }),
-    [openWalletConnect]
-  );
+  const value = useMemo(() => ({ openWalletConnect }), [openWalletConnect]);
 
   return (
     <DexWalletConnectContext.Provider value={value}>
       {children}
+      <WalletSelectModal open={modalOpen} onOpenChange={setModalOpen} />
     </DexWalletConnectContext.Provider>
   );
 };
 
 export const useDexWalletConnect = () => {
   const context = useContext(DexWalletConnectContext);
-
   if (!context) {
     throw new Error("useDexWalletConnect must be used within DexWalletConnectProvider");
   }
-
   return context;
 };
