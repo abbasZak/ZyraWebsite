@@ -480,7 +480,6 @@ const Liquidity = () => {
           ))}
         </div>
 
-        {/* Filter tabs */}
         <AILiquidityAdvisor />
 
         {/* Filter tabs */}
