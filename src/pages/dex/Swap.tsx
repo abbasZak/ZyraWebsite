@@ -23,6 +23,7 @@ interface Token {
 }
 
 const tokens: Token[] = [
+  { symbol: "ZRA", name: "Zyra", icon: "💎", mint: "3Jz9qH8kB8EyJJu8W1Mj5AS4GX54xJFfcnNNuWZ35bZE", decimals: 9 },
   { symbol: "SOL", name: "Solana", icon: "◎", mint: "So11111111111111111111111111111111111111112", decimals: 9, coingeckoId: "solana" },
   { symbol: "USDC", name: "USD Coin", icon: "💲", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6, coingeckoId: "usd-coin" },
   { symbol: "USDT", name: "Tether", icon: "💵", mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", decimals: 6, coingeckoId: "tether" },
