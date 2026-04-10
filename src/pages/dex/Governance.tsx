@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Vote, Clock, CheckCircle2, XCircle, Loader2, LogIn, Plus } from "lucide-react";
+import { Vote, Clock, CheckCircle2, XCircle, Loader2, LogIn, Plus, Users, BarChart3, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DexLayout from "@/components/dex/DexLayout";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -23,9 +23,9 @@ interface Proposal {
 }
 
 const statusConfig: Record<string, { label: string; icon: typeof Clock; className: string }> = {
-  active: { label: "Active", icon: Clock, className: "text-primary bg-primary/10" },
-  passed: { label: "Passed", icon: CheckCircle2, className: "text-primary bg-primary/10" },
-  rejected: { label: "Rejected", icon: XCircle, className: "text-destructive bg-destructive/10" },
+  active: { label: "Active", icon: Clock, className: "text-primary bg-primary/10 border border-primary/20" },
+  passed: { label: "Passed", icon: CheckCircle2, className: "text-primary bg-primary/10 border border-primary/20" },
+  rejected: { label: "Rejected", icon: XCircle, className: "text-destructive bg-destructive/10 border border-destructive/20" },
 };
 
 const Governance = () => {
@@ -45,7 +45,6 @@ const Governance = () => {
   const { setVisible } = useWalletModal();
   const { toast } = useToast();
 
-  // Fetch proposals
   useEffect(() => {
     const fetchData = async () => {
       setLoading(true);
@@ -55,7 +54,6 @@ const Governance = () => {
         .order("created_at", { ascending: false });
       if (data) setProposals(data);
 
-      // Fetch user votes
       if (user) {
         const { data: votes } = await supabase
           .from("governance_votes")
@@ -67,7 +65,6 @@ const Governance = () => {
     };
     fetchData();
 
-    // Subscribe to realtime updates
     const channel = supabase
       .channel("governance-proposals")
       .on("postgres_changes", { event: "UPDATE", schema: "public", table: "governance_proposals" }, (payload) => {
@@ -104,9 +101,8 @@ const Governance = () => {
       }
 
       setUserVotes((prev) => new Set(prev).add(proposalId));
-      toast({ title: `Vote cast: ${direction}!`, description: "Your vote has been recorded on-chain." });
+      toast({ title: `Vote cast: ${direction}! ✅`, description: "Your vote has been recorded." });
 
-      // Refresh proposals
       const { data } = await supabase.from("governance_proposals").select("*").order("created_at", { ascending: false });
       if (data) setProposals(data);
     } catch (e: any) {
@@ -150,55 +146,82 @@ const Governance = () => {
     }
   };
 
+  const totalVoters = proposals.reduce((s, p) => s + p.votes_for + p.votes_against, 0);
+  const activeProposals = proposals.filter(p => p.status === "active").length;
+
   return (
     <DexLayout>
       <div className="p-4 max-w-4xl mx-auto">
+        {/* Header */}
         <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-xl font-display font-bold">Governance</h1>
-            <p className="text-sm text-muted-foreground mt-0.5">Vote on proposals with your ZRA tokens</p>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-primary/30 to-primary/5 flex items-center justify-center glow-sm">
+              <Vote className="w-5 h-5 text-primary" />
+            </div>
+            <div>
+              <h1 className="text-xl font-display font-bold">Governance</h1>
+              <p className="text-xs text-muted-foreground mt-0.5">Vote on proposals with your ZRA tokens</p>
+            </div>
           </div>
           {user && connected ? (
-            <Button size="sm" className="gap-1.5 glow-sm" onClick={() => setShowCreate(!showCreate)}>
-              {showCreate ? <XCircle className="w-3.5 h-3.5" /> : <Vote className="w-3.5 h-3.5" />}
+            <Button size="sm" className="gap-1.5 glow-sm rounded-xl" onClick={() => setShowCreate(!showCreate)}>
+              {showCreate ? <XCircle className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
               {showCreate ? "Cancel" : "New Proposal"}
             </Button>
           ) : !user ? (
-            <Button size="sm" className="gap-1.5 glow-sm" onClick={() => navigate("/auth")}>
+            <Button size="sm" className="gap-1.5 glow-sm rounded-xl" onClick={() => navigate("/auth")}>
               <LogIn className="w-3.5 h-3.5" /> Sign In
             </Button>
           ) : (
-            <Button size="sm" className="gap-1.5 glow-sm" onClick={() => setVisible(true)}>
+            <Button size="sm" className="gap-1.5 glow-sm rounded-xl" onClick={() => setVisible(true)}>
               Connect Wallet
             </Button>
           )}
         </div>
 
+        {/* Stats */}
+        <div className="grid grid-cols-3 gap-3 mb-6">
+          {[
+            { label: "Proposals", value: String(proposals.length), icon: BarChart3, color: "text-primary" },
+            { label: "Active", value: String(activeProposals), icon: Sparkles, color: "text-amber-400" },
+            { label: "Total Votes", value: totalVoters.toLocaleString(), icon: Users, color: "text-violet-400" },
+          ].map((s) => (
+            <div key={s.label} className="glass rounded-xl p-3.5 gradient-border">
+              <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mb-1 uppercase tracking-widest font-semibold">
+                <s.icon className={`w-3 h-3 ${s.color}`} />{s.label}
+              </div>
+              <p className="text-lg font-bold">{s.value}</p>
+            </div>
+          ))}
+        </div>
+
         {/* Create proposal form */}
         {showCreate && (
-          <div className="glass rounded-xl p-4 gradient-border mb-6 animate-in slide-in-from-top-2 duration-200">
-            <h3 className="font-semibold text-sm mb-3">Create New Proposal</h3>
+          <div className="glass rounded-xl p-5 gradient-border mb-6 animate-fade-in">
+            <h3 className="font-bold text-sm mb-3 flex items-center gap-2">
+              <Plus className="w-4 h-4 text-primary" />Create New Proposal
+            </h3>
             <div className="space-y-3">
               <input
                 type="text"
                 placeholder="Proposal title"
                 value={newTitle}
                 onChange={(e) => setNewTitle(e.target.value)}
-                className="w-full bg-secondary/30 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-primary/30"
+                className="w-full bg-secondary/30 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 border border-border/30 focus:border-primary/30 transition-all"
               />
               <textarea
                 placeholder="Description (optional)"
                 value={newDesc}
                 onChange={(e) => setNewDesc(e.target.value)}
                 rows={3}
-                className="w-full bg-secondary/30 rounded-lg px-3 py-2.5 text-sm outline-none focus:ring-1 focus:ring-primary/30 resize-none"
+                className="w-full bg-secondary/30 rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 resize-none border border-border/30 focus:border-primary/30 transition-all"
               />
               <div className="flex items-center gap-3">
-                <label className="text-xs text-muted-foreground">Voting period:</label>
+                <label className="text-xs text-muted-foreground font-semibold">Voting period:</label>
                 <select
                   value={newEndDays}
                   onChange={(e) => setNewEndDays(e.target.value)}
-                  className="bg-secondary/30 rounded-lg px-3 py-1.5 text-sm outline-none"
+                  className="bg-secondary/30 rounded-lg px-3 py-2 text-sm outline-none border border-border/30"
                 >
                   <option value="3">3 days</option>
                   <option value="7">7 days</option>
@@ -206,8 +229,8 @@ const Governance = () => {
                   <option value="30">30 days</option>
                 </select>
               </div>
-              <Button className="w-full glow-sm" size="sm" disabled={creating || !newTitle.trim()} onClick={handleCreateProposal}>
-                {creating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Plus className="w-3.5 h-3.5 mr-1" />}
+              <Button className="w-full glow-sm rounded-xl h-11" disabled={creating || !newTitle.trim()} onClick={handleCreateProposal}>
+                {creating ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Vote className="w-4 h-4 mr-1.5" />}
                 {creating ? "Creating..." : "Submit Proposal"}
               </Button>
             </div>
@@ -215,8 +238,9 @@ const Governance = () => {
         )}
 
         {loading ? (
-          <div className="flex items-center justify-center py-20">
-            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+          <div className="flex flex-col items-center justify-center py-20 gap-3">
+            <Loader2 className="w-8 h-8 animate-spin text-primary" />
+            <span className="text-sm text-muted-foreground">Loading proposals...</span>
           </div>
         ) : (
           <div className="space-y-3">
@@ -227,57 +251,70 @@ const Governance = () => {
               const StatusIcon = config.icon;
               const hasVoted = userVotes.has(p.id);
               const isVoting = votingId === p.id;
+              const daysLeft = Math.max(0, Math.ceil((new Date(p.end_date).getTime() - Date.now()) / 86400000));
 
               return (
-                <div key={p.id} className="glass rounded-xl p-4 gradient-border hover:bg-secondary/20 transition-colors">
-                  <div className="flex items-start justify-between gap-3 mb-3">
-                    <div>
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="text-xs text-muted-foreground font-mono">{p.proposal_id}</span>
-                        <span className={`inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium ${config.className}`}>
-                          <StatusIcon className="w-3 h-3" />
-                          {config.label}
-                        </span>
-                        {hasVoted && (
-                          <span className="text-xs text-primary bg-primary/10 px-2 py-0.5 rounded-full">Voted</span>
-                        )}
+                <div key={p.id} className="glass rounded-xl gradient-border hover:bg-secondary/10 transition-all duration-300 overflow-hidden">
+                  <div className="p-5">
+                    <div className="flex items-start justify-between gap-3 mb-4">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                          <span className="text-[10px] text-muted-foreground font-mono bg-secondary/50 px-1.5 py-0.5 rounded">{p.proposal_id}</span>
+                          <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-bold ${config.className}`}>
+                            <StatusIcon className="w-3 h-3" />
+                            {config.label}
+                          </span>
+                          {hasVoted && (
+                            <span className="text-[10px] text-primary bg-primary/10 px-2 py-0.5 rounded-full font-bold border border-primary/20">✓ Voted</span>
+                          )}
+                        </div>
+                        <h3 className="font-bold text-sm">{p.title}</h3>
+                        {p.description && <p className="text-xs text-muted-foreground mt-1.5 line-clamp-2 leading-relaxed">{p.description}</p>}
+                        <p className="text-[10px] text-muted-foreground mt-1.5 flex items-center gap-2">
+                          <span>by {p.author_label}</span>
+                          <span>·</span>
+                          <span className={daysLeft <= 1 ? "text-destructive font-semibold" : ""}>
+                            {daysLeft > 0 ? `${daysLeft}d left` : "Ended"}
+                          </span>
+                        </p>
                       </div>
-                      <h3 className="font-semibold text-sm">{p.title}</h3>
-                      {p.description && <p className="text-xs text-muted-foreground mt-1 line-clamp-2">{p.description}</p>}
-                      <p className="text-xs text-muted-foreground mt-0.5">by {p.author_label} · ends {new Date(p.end_date).toLocaleDateString()}</p>
+                      {p.status === "active" && user && connected && !hasVoted && (
+                        <div className="flex gap-1.5 shrink-0">
+                          {isVoting ? (
+                            <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                          ) : (
+                            <>
+                              <Button size="sm" variant="outline" className="text-xs h-8 px-3 border-primary/20 hover:bg-primary/10 hover:text-primary rounded-lg font-semibold" onClick={() => handleVote(p.id, "for")}>
+                                ✓ For
+                              </Button>
+                              <Button size="sm" variant="outline" className="text-xs h-8 px-3 border-destructive/20 hover:bg-destructive/10 hover:text-destructive rounded-lg font-semibold" onClick={() => handleVote(p.id, "against")}>
+                                ✗ Against
+                              </Button>
+                            </>
+                          )}
+                        </div>
+                      )}
                     </div>
-                    {p.status === "active" && user && connected && !hasVoted && (
-                      <div className="flex gap-1.5 shrink-0">
-                        {isVoting ? (
-                          <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                        ) : (
-                          <>
-                            <Button size="sm" variant="outline" className="text-xs h-7 border-primary/20 hover:bg-primary/10 hover:text-primary" onClick={() => handleVote(p.id, "for")}>
-                              For
-                            </Button>
-                            <Button size="sm" variant="outline" className="text-xs h-7 border-destructive/20 hover:bg-destructive/10 hover:text-destructive" onClick={() => handleVote(p.id, "against")}>
-                              Against
-                            </Button>
-                          </>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                  {/* Vote bar */}
-                  <div className="h-2 rounded-full bg-secondary/50 overflow-hidden">
-                    <div className="h-full rounded-full bg-primary transition-all" style={{ width: `${forPct}%` }} />
-                  </div>
-                  <div className="flex justify-between text-xs text-muted-foreground mt-1.5">
-                    <span className="text-primary">{forPct.toFixed(1)}% For ({(p.votes_for / 1_000_000).toFixed(1)}M)</span>
-                    <span className="text-destructive">{(100 - forPct).toFixed(1)}% Against ({(p.votes_against / 1_000_000).toFixed(1)}M)</span>
+                    {/* Vote bar */}
+                    <div className="h-2.5 rounded-full bg-secondary/50 overflow-hidden flex">
+                      <div className="h-full bg-gradient-to-r from-primary to-emerald-400 transition-all duration-700" style={{ width: `${forPct}%` }} />
+                      <div className="h-full bg-gradient-to-r from-red-500 to-destructive transition-all duration-700 flex-1" />
+                    </div>
+                    <div className="flex justify-between text-[10px] text-muted-foreground mt-2">
+                      <span className="text-primary font-semibold">{forPct.toFixed(1)}% For ({totalVotes > 0 ? p.votes_for.toLocaleString() : "0"} votes)</span>
+                      <span className="text-destructive font-semibold">{(100 - forPct).toFixed(1)}% Against ({totalVotes > 0 ? p.votes_against.toLocaleString() : "0"} votes)</span>
+                    </div>
                   </div>
                 </div>
               );
             })}
             {proposals.length === 0 && (
-              <div className="text-center py-12 text-muted-foreground">
-                <Vote className="w-8 h-8 mx-auto mb-2 opacity-50" />
-                <p>No proposals yet. Be the first to create one!</p>
+              <div className="text-center py-16">
+                <div className="w-16 h-16 rounded-2xl bg-secondary/30 flex items-center justify-center mx-auto mb-4">
+                  <Vote className="w-7 h-7 text-muted-foreground/50" />
+                </div>
+                <p className="text-sm text-muted-foreground mb-1">No proposals yet</p>
+                <p className="text-xs text-muted-foreground/70">Be the first to create one!</p>
               </div>
             )}
           </div>
