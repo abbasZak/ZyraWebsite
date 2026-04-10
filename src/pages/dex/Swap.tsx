@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction, SystemProgram, PublicKey, Transaction } from "@solana/web3.js";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useDexWalletConnect } from "@/components/dex/DexWalletConnectProvider";
 
 const PLATFORM_FEE_WALLET = new PublicKey("2JgxWdxKRgzfJV3AEarCCKtQ4WNMbk52f6kBqHxYjpnJ");
 const PLATFORM_FEE_LAMPORTS = 10_000_000; // 0.01 SOL

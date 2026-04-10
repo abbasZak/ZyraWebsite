@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useDexWalletConnect } from "@/components/dex/DexWalletConnectProvider";
 
 /* ── Token registry ────────────────────────────────────── */
 const TOKENS: Record<string, { symbol: string; mint: string; decimals: number; icon: string; cgId?: string }> = {

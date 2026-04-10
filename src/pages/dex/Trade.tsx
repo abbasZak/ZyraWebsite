@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useToast } from "@/hooks/use-toast";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useDexWalletConnect } from "@/components/dex/DexWalletConnectProvider";
 import { SystemProgram, PublicKey, Transaction } from "@solana/web3.js";
 import { supabase } from "@/integrations/supabase/client";
 import {

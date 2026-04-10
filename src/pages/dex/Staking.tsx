@@ -9,7 +9,7 @@ import { useConnection } from "@solana/wallet-adapter-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getZraBalance, buildZraTransferTx } from "@/lib/zra-token";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useDexWalletConnect } from "@/components/dex/DexWalletConnectProvider";
 
 const stakingTiers = [
   { duration: 30, label: "30 Days", apr: 8, minStake: 1000, lockIcon: "🔓", color: "from-emerald-500/20 to-emerald-500/5", borderColor: "border-emerald-500/20" },
