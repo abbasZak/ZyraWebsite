@@ -23,6 +23,12 @@ const team = [
     bio: "5+ years in crypto. Drives ecosystem development, market strategy, and community growth to position Zyra globally.",
     image: sadiqImg,
   },
+  {
+    name: "Abbas Zakariya",
+    role: "Technical Co-Founder",
+    bio: "Spearheading the development of the Zyra platform. Drives technical architecture, engineering execution, and product innovation.",
+    image: abbasImg,
+  },
 ];
 
 const advisors = [
