@@ -6,9 +6,9 @@ import DexLayout from "@/components/dex/DexLayout";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction, SystemProgram, PublicKey, Transaction } from "@solana/web3.js";
+import { useDexWalletConnect } from "@/components/dex/DexWalletConnectProvider";
 
 const PLATFORM_FEE_WALLET = new PublicKey("2JgxWdxKRgzfJV3AEarCCKtQ4WNMbk52f6kBqHxYjpnJ");
 const PLATFORM_FEE_LAMPORTS = 10_000_000; // 0.01 SOL
@@ -56,11 +56,11 @@ const Swap = () => {
   const quoteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { publicKey, connected, signTransaction } = useWallet();
-  const { setVisible } = useWalletModal();
   const { connection } = useConnection();
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
+  const { openWalletConnect } = useDexWalletConnect();
 
   // Fetch live prices
   useEffect(() => {
@@ -368,7 +368,7 @@ const Swap = () => {
                 <LogIn className="w-4 h-4 mr-2" /> Sign In to Swap
               </Button>
             ) : !connected ? (
-              <Button className="w-full mt-3 h-12 text-base font-semibold glow-sm" size="lg" onClick={() => setVisible(true)}>
+              <Button className="w-full mt-3 h-12 text-base font-semibold glow-sm" size="lg" onClick={() => void openWalletConnect()}>
                 Connect Wallet to Swap
               </Button>
             ) : (

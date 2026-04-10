@@ -5,9 +5,9 @@ import DexLayout from "@/components/dex/DexLayout";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useToast } from "@/hooks/use-toast";
+import { useDexWalletConnect } from "@/components/dex/DexWalletConnectProvider";
 import { SystemProgram, PublicKey, Transaction } from "@solana/web3.js";
 import {
   ResponsiveContainer,
@@ -81,9 +81,9 @@ const Trade = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { publicKey, connected, signTransaction } = useWallet();
-  const { setVisible } = useWalletModal();
   const { connection } = useConnection();
   const { toast } = useToast();
+  const { openWalletConnect } = useDexWalletConnect();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Fetch live SOL price from CoinGecko
@@ -486,7 +486,7 @@ const Trade = () => {
                   <LogIn className="w-4 h-4 mr-2" /> Sign In to Trade
                 </Button>
               ) : !connected ? (
-                <Button className="w-full h-11 font-semibold glow-sm" onClick={() => setVisible(true)}>
+                <Button className="w-full h-11 font-semibold glow-sm" onClick={() => void openWalletConnect()}>
                   Connect Wallet
                 </Button>
               ) : (

@@ -5,9 +5,9 @@ import DexLayout from "@/components/dex/DexLayout";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useDexWalletConnect } from "@/components/dex/DexWalletConnectProvider";
 
 /* ── Token registry ────────────────────────────────────── */
 const TOKENS: Record<string, { symbol: string; mint: string; decimals: number; icon: string; cgId?: string }> = {
@@ -79,8 +79,8 @@ const Liquidity = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { connected } = useWallet();
-  const { setVisible } = useWalletModal();
   const { toast } = useToast();
+  const { openWalletConnect } = useDexWalletConnect();
 
   const getFormState = (pair: string): PoolFormState => formStates[pair] || { amountA: "", amountB: "" };
   
@@ -501,7 +501,7 @@ const Liquidity = () => {
                           variant="outline"
                           size="sm"
                           className="text-xs shrink-0 border-primary/20 rounded-lg"
-                          onClick={() => setVisible(true)}
+                          onClick={() => void openWalletConnect()}
                         >
                           Connect Wallet
                         </Button>
