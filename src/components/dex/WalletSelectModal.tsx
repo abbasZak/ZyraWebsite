@@ -43,13 +43,9 @@ const isInsideWalletBrowser = (walletName: string) => {
   return false;
 };
 
-const canConnectInCurrentBrowser = (walletName: string, readyState: WalletReadyState) => {
+const canConnectInCurrentBrowser = (_walletName: string, readyState: WalletReadyState) => {
   if (readyState === WalletReadyState.Installed) return true;
-
-  if (walletName === "Solflare" && !isMobileBrowser() && readyState === WalletReadyState.Loadable) {
-    return true;
-  }
-
+  if (readyState === WalletReadyState.Loadable) return true;
   return false;
 };
 
