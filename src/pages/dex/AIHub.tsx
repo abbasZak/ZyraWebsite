@@ -6,7 +6,6 @@ import {
   Shield,
   Activity,
   PieChart,
-  Droplets,
   AlertTriangle,
   CheckCircle2,
   ArrowRight,
@@ -24,8 +23,6 @@ import {
   Bot,
   Lock,
   Gauge,
-  Target,
-  Flame,
   Radio,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
