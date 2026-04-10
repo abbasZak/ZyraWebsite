@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useDexWalletConnect } from "@/components/dex/DexWalletConnectProvider";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
 interface Proposal {
   id: string;
@@ -43,7 +43,7 @@ const Governance = () => {
   const navigate = useNavigate();
   const { connected } = useWallet();
   const { toast } = useToast();
-  const { openWalletConnect } = useDexWalletConnect();
+  const { setVisible: openWalletModal } = useWalletModal();
 
   useEffect(() => {
     const fetchData = async () => {

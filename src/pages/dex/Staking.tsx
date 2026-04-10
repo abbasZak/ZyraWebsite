@@ -9,7 +9,7 @@ import { useConnection } from "@solana/wallet-adapter-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getZraBalance, buildZraTransferTx } from "@/lib/zra-token";
-import { useDexWalletConnect } from "@/components/dex/DexWalletConnectProvider";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
 const stakingTiers = [
   { duration: 30, label: "30 Days", apr: 8, minStake: 1000, lockIcon: "🔓", color: "from-emerald-500/20 to-emerald-500/5", borderColor: "border-emerald-500/20" },
@@ -42,7 +42,7 @@ const Staking = () => {
   const { publicKey, connected, signTransaction } = useWallet();
   const { connection } = useConnection();
   const { toast } = useToast();
-  const { openWalletConnect } = useDexWalletConnect();
+  const { setVisible: openWalletModal } = useWalletModal();
 
   // Fetch ZRA balance when wallet connects
   const fetchBalance = useCallback(async () => {

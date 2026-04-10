@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useToast } from "@/hooks/use-toast";
-import { useDexWalletConnect } from "@/components/dex/DexWalletConnectProvider";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { SystemProgram, PublicKey, Transaction } from "@solana/web3.js";
 import {
   ResponsiveContainer,
@@ -83,7 +83,7 @@ const Trade = () => {
   const { publicKey, connected, signTransaction } = useWallet();
   const { connection } = useConnection();
   const { toast } = useToast();
-  const { openWalletConnect } = useDexWalletConnect();
+  const { setVisible: openWalletModal } = useWalletModal();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Fetch live SOL price from CoinGecko
