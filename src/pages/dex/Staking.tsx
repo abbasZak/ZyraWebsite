@@ -1,13 +1,15 @@
-import { useState, useEffect } from "react";
-import { Coins, Lock, Clock, TrendingUp, Loader2, LogIn, Sparkles, Shield, Zap, Gift } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
+import { Coins, Lock, Clock, TrendingUp, Loader2, LogIn, Sparkles, Shield, Zap, Gift, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DexLayout from "@/components/dex/DexLayout";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { getZraBalance, buildZraTransferTx } from "@/lib/zra-token";
 
 const stakingTiers = [
   { duration: 30, label: "30 Days", apr: 8, minStake: 1000, lockIcon: "🔓", color: "from-emerald-500/20 to-emerald-500/5", borderColor: "border-emerald-500/20" },
@@ -32,12 +34,37 @@ const Staking = () => {
   const [amounts, setAmounts] = useState<Record<number, string>>({});
   const [loading, setLoading] = useState(false);
   const [submittingTier, setSubmittingTier] = useState<number | null>(null);
+  const [zraBalance, setZraBalance] = useState<number | null>(null);
+  const [balanceLoading, setBalanceLoading] = useState(false);
 
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { connected } = useWallet();
+  const { publicKey, connected, signTransaction } = useWallet();
   const { setVisible } = useWalletModal();
+  const { connection } = useConnection();
   const { toast } = useToast();
+
+  // Fetch ZRA balance when wallet connects
+  const fetchBalance = useCallback(async () => {
+    if (!publicKey || !connected) {
+      setZraBalance(null);
+      return;
+    }
+    setBalanceLoading(true);
+    try {
+      const bal = await getZraBalance(connection, publicKey);
+      setZraBalance(bal);
+    } catch (e) {
+      console.error("Failed to fetch ZRA balance:", e);
+      setZraBalance(0);
+    } finally {
+      setBalanceLoading(false);
+    }
+  }, [publicKey, connected, connection]);
+
+  useEffect(() => {
+    fetchBalance();
+  }, [fetchBalance]);
 
   useEffect(() => {
     if (!user) return;
@@ -55,15 +82,36 @@ const Staking = () => {
   }, [user]);
 
   const handleStake = async (tier: typeof stakingTiers[0]) => {
-    if (!user || !connected) return;
+    if (!user || !connected || !publicKey || !signTransaction) return;
     const amt = parseFloat(amounts[tier.duration] || "0");
     if (amt < tier.minStake) {
       toast({ title: `Minimum stake is ${tier.minStake.toLocaleString()} ZRA`, variant: "destructive" });
       return;
     }
 
+    if (zraBalance !== null && amt > zraBalance) {
+      toast({ title: `Insufficient ZRA balance`, description: `You have ${zraBalance.toLocaleString()} ZRA`, variant: "destructive" });
+      return;
+    }
+
     setSubmittingTier(tier.duration);
     try {
+      // Build and send on-chain ZRA transfer to vault
+      const tx = await buildZraTransferTx(connection, publicKey, amt);
+      const signedTx = await signTransaction(tx);
+      const txid = await connection.sendRawTransaction(signedTx.serialize(), {
+        skipPreflight: true,
+        maxRetries: 3,
+      });
+
+      const bh = await connection.getLatestBlockhash();
+      await connection.confirmTransaction({
+        blockhash: bh.blockhash,
+        lastValidBlockHeight: bh.lastValidBlockHeight,
+        signature: txid,
+      }, "confirmed");
+
+      // Record stake in database after successful on-chain transfer
       const endDate = new Date();
       endDate.setDate(endDate.getDate() + tier.duration);
 
@@ -79,11 +127,16 @@ const Staking = () => {
 
       if (error) throw error;
 
-      toast({ title: "Staked Successfully! 🎉", description: `${amt.toLocaleString()} ZRA locked for ${tier.label} at ${tier.apr}% APR` });
+      toast({
+        title: "Staked Successfully! 🎉",
+        description: `${amt.toLocaleString()} ZRA locked for ${tier.label} at ${tier.apr}% APR — tokens transferred on-chain`,
+      });
 
+      // Refresh data
       const { data } = await supabase.from("stakes").select("*").eq("user_id", user.id).order("created_at", { ascending: false });
       if (data) setStakes(data);
       setAmounts((prev) => ({ ...prev, [tier.duration]: "" }));
+      fetchBalance(); // refresh balance
     } catch (e: any) {
       toast({ title: "Staking Failed", description: e.message, variant: "destructive" });
     } finally {
@@ -119,6 +172,19 @@ const Staking = () => {
             </div>
           </div>
         </div>
+
+        {/* Wallet Balance Banner */}
+        {connected && zraBalance !== null && (
+          <div className="mb-4 glass rounded-xl p-4 gradient-border flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-primary" />
+              <span className="text-sm font-semibold">Wallet ZRA Balance</span>
+            </div>
+            <span className="text-lg font-bold text-primary">
+              {balanceLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : `${zraBalance.toLocaleString()} ZRA`}
+            </span>
+          </div>
+        )}
 
         {/* Overview */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
@@ -218,7 +284,7 @@ const Staking = () => {
                   ) : (
                     <Button className="w-full glow-sm rounded-xl h-11" disabled={submittingTier === tier.duration} onClick={() => handleStake(tier)}>
                       {submittingTier === tier.duration ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                      {submittingTier === tier.duration ? "Staking..." : "Stake ZRA"}
+                      {submittingTier === tier.duration ? "Transferring & Staking..." : "Stake ZRA"}
                     </Button>
                   )}
                 </div>
