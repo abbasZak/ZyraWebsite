@@ -3,7 +3,6 @@ import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
-import { DexWalletConnectProvider } from "./DexWalletConnectProvider";
 
 import "@solana/wallet-adapter-react-ui/styles.css";
 
@@ -27,9 +26,7 @@ const SolanaWalletProvider = ({ children }: Props) => {
   return (
     <ConnectionProvider endpoint={endpoint}>
       <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>
-          <DexWalletConnectProvider>{children}</DexWalletConnectProvider>
-        </WalletModalProvider>
+        <WalletModalProvider>{children}</WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>
   );

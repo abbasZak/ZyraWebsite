@@ -1,4 +1,5 @@
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useCallback, useMemo } from "react";
 import { Wallet, ChevronDown, Copy, LogOut, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,12 +11,11 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { useDexWalletConnect } from "./DexWalletConnectProvider";
 
 const WalletButton = () => {
   const { publicKey, wallet, disconnect, connected, connecting } = useWallet();
   const { toast } = useToast();
-  const { openWalletConnect } = useDexWalletConnect();
+  const { setVisible } = useWalletModal();
 
   const base58 = useMemo(() => publicKey?.toBase58(), [publicKey]);
   const displayAddress = useMemo(() => {
@@ -74,7 +74,7 @@ const WalletButton = () => {
     <Button
       size="sm"
       className="gap-2 glow-sm"
-      onClick={openWalletConnect}
+      onClick={() => setVisible(true)}
       disabled={connecting}
     >
       <Wallet className="w-4 h-4" />
