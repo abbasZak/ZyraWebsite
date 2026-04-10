@@ -110,7 +110,9 @@ serve(async (req) => {
         model: "google/gemini-3-flash-preview",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Analyze current market conditions as of ${new Date().toISOString()}. Provide fresh, realistic data.` },
+          { role: "user", content: tool === "instructor" && question
+            ? question
+            : `Analyze current market conditions as of ${new Date().toISOString()}. Provide fresh, realistic data.` },
         ],
       }),
     });
