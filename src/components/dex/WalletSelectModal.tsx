@@ -159,7 +159,7 @@ const WalletSelectModal = ({ open, onOpenChange }: WalletSelectModalProps) => {
         {isMobileBrowser() && (
           <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-secondary/20 p-3 text-xs text-muted-foreground">
             <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-            <p>On mobile, open Zyra inside Phantom or Solflare first, then connect normally from there.</p>
+            <p>On mobile, tapping a wallet will open it so you can approve the connection and return here.</p>
           </div>
         )}
       </DialogContent>
