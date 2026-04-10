@@ -59,7 +59,7 @@ const TeamSection = () => {
           </p>
         </motion.div>
 
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5 max-w-4xl mx-auto mb-32">
+        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-5 max-w-5xl mx-auto mb-32">
           {team.map((member, i) => (
             <motion.div
               key={member.name}
