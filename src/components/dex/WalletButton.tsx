@@ -1,5 +1,5 @@
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useCallback, useMemo } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Wallet, ChevronDown, Copy, LogOut, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,12 +10,12 @@ import {
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import { useToast } from "@/hooks/use-toast";
-import { useDexWalletConnect } from "./DexWalletConnectProvider";
+import WalletSelectModal from "./WalletSelectModal";
 
 const WalletButton = () => {
   const { publicKey, wallet, disconnect, connected, connecting } = useWallet();
   const { toast } = useToast();
-  const { openWalletConnect } = useDexWalletConnect();
+  const [modalOpen, setModalOpen] = useState(false);
 
   const base58 = useMemo(() => publicKey?.toBase58(), [publicKey]);
   const displayAddress = useMemo(() => {
@@ -71,15 +71,18 @@ const WalletButton = () => {
   }
 
   return (
-    <Button
-      size="sm"
-      className="gap-2 glow-sm"
-      onClick={() => void openWalletConnect()}
-      disabled={connecting}
-    >
-      <Wallet className="w-4 h-4" />
-      {connecting ? "Connecting..." : "Connect Wallet"}
-    </Button>
+    <>
+      <Button
+        size="sm"
+        className="gap-2 glow-sm"
+        onClick={() => setModalOpen(true)}
+        disabled={connecting}
+      >
+        <Wallet className="w-4 h-4" />
+        {connecting ? "Connecting..." : "Connect Wallet"}
+      </Button>
+      <WalletSelectModal open={modalOpen} onOpenChange={setModalOpen} />
+    </>
   );
 };
 
