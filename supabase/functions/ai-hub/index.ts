@@ -83,7 +83,7 @@ serve(async (req) => {
   }
 
   try {
-    const { tool } = await req.json();
+    const { tool, question } = await req.json();
     const systemPrompt = SYSTEM_PROMPTS[tool];
     if (!systemPrompt) {
       return new Response(JSON.stringify({ error: "Invalid tool" }), {
