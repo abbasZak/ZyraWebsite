@@ -2,6 +2,7 @@ import { motion } from "framer-motion";
 import fatimaImg from "@/assets/team-fatima.png";
 import usmanImg from "@/assets/team-usman.jpeg";
 import sadiqImg from "@/assets/team-sadiq.jpeg";
+import abbasImg from "@/assets/team-technical-cofounder.jpeg";
 
 const team = [
   {
