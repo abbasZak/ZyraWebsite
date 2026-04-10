@@ -481,6 +481,9 @@ const Liquidity = () => {
         </div>
 
         {/* Filter tabs */}
+        <AILiquidityAdvisor />
+
+        {/* Filter tabs */}
         <div className="flex gap-1.5 mb-4">
           {([["all", "All Pools"], ["zra", "ZRA Pools"], ["sol", "SOL Pools"]] as const).map(([key, label]) => (
             <button
