@@ -119,7 +119,7 @@ const WalletSelectModal = ({ open, onOpenChange }: WalletSelectModalProps) => {
         <DialogHeader>
           <DialogTitle className="text-lg font-bold">Connect Wallet</DialogTitle>
           <DialogDescription>
-            Choose a wallet to connect. Automatic mobile redirects have been removed.
+            Choose a wallet to connect. On mobile, you'll be redirected to the wallet app.
           </DialogDescription>
         </DialogHeader>
 
