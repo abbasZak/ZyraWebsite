@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from "react";
-import { TrendingUp, TrendingDown, Loader2, LogIn } from "lucide-react";
+import { useState, useEffect, useCallback, useRef, useMemo, type ReactNode } from "react";
+import { TrendingUp, TrendingDown, Loader2, LogIn, Brain, AlertTriangle, Shield, RefreshCw, Target, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DexLayout from "@/components/dex/DexLayout";
 import { useAuth } from "@/components/auth/AuthProvider";
@@ -9,6 +9,7 @@ import { useConnection } from "@solana/wallet-adapter-react";
 import { useToast } from "@/hooks/use-toast";
 import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { SystemProgram, PublicKey, Transaction } from "@solana/web3.js";
+import { supabase } from "@/integrations/supabase/client";
 import {
   ResponsiveContainer,
   ComposedChart,
@@ -62,6 +63,149 @@ const TIMEFRAMES: { label: string; days: string; cgParam: string }[] = [
   { label: "1W", days: "30", cgParam: "30" },
   { label: "1M", days: "90", cgParam: "90" },
 ];
+
+/* ── AI Trade Advisor Widget ── */
+const AITradeAdvisor = () => {
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchAdvice = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: result, error: fnError } = await supabase.functions.invoke("ai-hub", {
+        body: { tool: "trade_advisor" },
+      });
+      if (fnError) throw new Error(fnError.message);
+      if (result?.error) throw new Error(result.error);
+      setData(result);
+    } catch (e: any) {
+      setError(e?.message || "AI advisor unavailable");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { fetchAdvice(); }, [fetchAdvice]);
+
+  if (loading) return (
+    <div className="glass rounded-xl p-4 gradient-border">
+      <div className="flex items-center gap-2 mb-3">
+        <Brain className="w-4 h-4 text-primary animate-pulse" />
+        <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">AI Trade Advisor</span>
+      </div>
+      <div className="flex items-center justify-center py-8 gap-2">
+        <Loader2 className="w-4 h-4 animate-spin text-primary" />
+        <span className="text-xs text-muted-foreground">Analyzing market...</span>
+      </div>
+    </div>
+  );
+
+  if (error) return (
+    <div className="glass rounded-xl p-4 gradient-border">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <Brain className="w-4 h-4 text-destructive" />
+          <span className="text-xs font-bold">AI Trade Advisor</span>
+        </div>
+        <Button size="sm" variant="ghost" className="h-6 text-[10px]" onClick={fetchAdvice}><RefreshCw className="w-3 h-3" /></Button>
+      </div>
+      <p className="text-xs text-destructive">{error}</p>
+    </div>
+  );
+
+  if (!data) return null;
+
+  const sentimentColor = data.marketSentiment === "Bullish" ? "text-primary" : data.marketSentiment === "Bearish" ? "text-destructive" : "text-amber-400";
+  const riskColor = data.riskLevel === "Low" ? "text-primary bg-primary/10" : data.riskLevel === "Medium" ? "text-amber-400 bg-amber-500/10" : data.riskLevel === "High" ? "text-red-400 bg-red-500/10" : "text-red-500 bg-red-500/15";
+  const recColor = data.recommendation === "Buy" ? "bg-primary/15 text-primary border-primary/20" : data.recommendation === "Sell" ? "bg-destructive/15 text-destructive border-destructive/20" : "bg-amber-500/15 text-amber-400 border-amber-500/20";
+
+  return (
+    <div className="glass rounded-xl gradient-border overflow-hidden">
+      <div className="p-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-2">
+            <Brain className="w-4 h-4 text-primary" />
+            <span className="text-xs font-bold text-muted-foreground uppercase tracking-widest">AI Trade Advisor</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+          </div>
+          <Button size="sm" variant="ghost" className="h-6 text-[10px] gap-1" onClick={fetchAdvice}>
+            <RefreshCw className="w-3 h-3" />
+          </Button>
+        </div>
+
+        {/* Sentiment + Recommendation */}
+        <div className="flex items-center gap-2 mb-3">
+          <span className={`text-sm font-bold ${sentimentColor}`}>{data.marketSentiment}</span>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${recColor}`}>{data.recommendation}</span>
+          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${riskColor}`}>Risk: {data.riskLevel}</span>
+        </div>
+
+        {/* Signals */}
+        {data.signals?.length > 0 && (
+          <div className="space-y-1.5 mb-3">
+            {data.signals.map((s: any, i: number) => (
+              <div key={i} className="flex items-center justify-between text-[11px]">
+                <span className="text-muted-foreground">{s.indicator}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-foreground">{s.value}</span>
+                  <span className={`font-bold ${s.signal === "Bullish" ? "text-primary" : s.signal === "Bearish" ? "text-destructive" : "text-amber-400"}`}>{s.signal}</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Trade Setup */}
+        {data.tradeSetup && (
+          <div className="bg-secondary/20 rounded-lg p-2.5 mb-3 text-[11px] space-y-1">
+            <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+              <Target className="w-3 h-3 text-primary" />
+              <span className="font-bold uppercase tracking-widest text-[10px]">Trade Setup</span>
+            </div>
+            <div className="grid grid-cols-2 gap-x-4 gap-y-0.5">
+              <span className="text-muted-foreground">Entry</span><span className="text-right font-mono">{data.tradeSetup.entry}</span>
+              <span className="text-muted-foreground">Stop Loss</span><span className="text-right font-mono text-destructive">{data.tradeSetup.stopLoss}</span>
+              <span className="text-muted-foreground">Take Profit</span><span className="text-right font-mono text-primary">{data.tradeSetup.takeProfit}</span>
+              <span className="text-muted-foreground">R:R Ratio</span><span className="text-right font-mono">{data.tradeSetup.riskRewardRatio}</span>
+            </div>
+          </div>
+        )}
+
+        {/* Risk Warnings */}
+        {data.riskWarnings?.length > 0 && (
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
+              <AlertTriangle className="w-3 h-3 text-amber-400" />Risk Warnings
+            </div>
+            {data.riskWarnings.map((w: any, i: number) => (
+              <div key={i} className={`rounded-lg p-2 text-[11px] flex items-start gap-2 ${
+                w.severity === "Critical" ? "bg-red-500/10 border border-red-500/20" :
+                w.severity === "High" ? "bg-amber-500/10 border border-amber-500/20" :
+                "bg-secondary/30 border border-border/20"
+              }`}>
+                <Shield className={`w-3 h-3 shrink-0 mt-0.5 ${
+                  w.severity === "Critical" ? "text-red-400" : w.severity === "High" ? "text-amber-400" : "text-muted-foreground"
+                }`} />
+                <div>
+                  <span className="text-foreground">{w.warning}</span>
+                  <span className={`ml-2 font-bold ${
+                    w.severity === "Critical" ? "text-red-400" : w.severity === "High" ? "text-amber-400" : "text-muted-foreground"
+                  }`}>({w.lossLikelihood} loss chance)</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        <p className="text-[10px] text-muted-foreground mt-3 flex items-center gap-1">
+          <Sparkles className="w-3 h-3" />Confidence: {data.confidencePercent}% · AI analysis, not financial advice
+        </p>
+      </div>
+    </div>
+  );
+};
 
 const Trade = () => {
   const [orderType, setOrderType] = useState<"limit" | "market">("limit");
