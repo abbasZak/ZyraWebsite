@@ -191,7 +191,7 @@ const Liquidity = () => {
   const navigate = useNavigate();
   const { connected } = useWallet();
   const { toast } = useToast();
-  const { setVisible: openWalletModal } = useWalletModal();
+  const { openWalletConnect } = useDexWalletConnect();
 
   const getFormState = (pair: string): PoolFormState => formStates[pair] || { amountA: "", amountB: "" };
   

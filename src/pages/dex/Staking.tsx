@@ -42,7 +42,7 @@ const Staking = () => {
   const { publicKey, connected, signTransaction } = useWallet();
   const { connection } = useConnection();
   const { toast } = useToast();
-  const { setVisible: openWalletModal } = useWalletModal();
+  const { openWalletConnect } = useDexWalletConnect();
 
   // Fetch ZRA balance when wallet connects
   const fetchBalance = useCallback(async () => {

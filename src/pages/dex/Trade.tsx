@@ -227,7 +227,7 @@ const Trade = () => {
   const { publicKey, connected, signTransaction } = useWallet();
   const { connection } = useConnection();
   const { toast } = useToast();
-  const { setVisible: openWalletModal } = useWalletModal();
+  const { openWalletConnect } = useDexWalletConnect();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   // Fetch live SOL price from CoinGecko

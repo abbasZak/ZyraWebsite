@@ -60,7 +60,7 @@ const Swap = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { setVisible: openWalletModal } = useWalletModal();
+  const { openWalletConnect } = useDexWalletConnect();
 
   // Fetch live prices
   useEffect(() => {

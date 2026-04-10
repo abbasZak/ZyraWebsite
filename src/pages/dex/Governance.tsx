@@ -43,7 +43,7 @@ const Governance = () => {
   const navigate = useNavigate();
   const { connected } = useWallet();
   const { toast } = useToast();
-  const { setVisible: openWalletModal } = useWalletModal();
+  const { openWalletConnect } = useDexWalletConnect();
 
   useEffect(() => {
     const fetchData = async () => {
