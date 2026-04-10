@@ -43,22 +43,30 @@ const isInsideWalletBrowser = (walletName: string) => {
   return false;
 };
 
-const canConnectInCurrentBrowser = (_walletName: string, readyState: WalletReadyState) => {
+const DEEPLINK_URLS: Record<string, (appUrl: string) => string> = {
+  Phantom: (appUrl) =>
+    `https://phantom.app/ul/browse/${encodeURIComponent(appUrl)}?ref=${encodeURIComponent(appUrl)}`,
+  Solflare: (appUrl) =>
+    `https://solflare.com/ul/v1/browse/${encodeURIComponent(appUrl)}?ref=${encodeURIComponent(appUrl)}`,
+};
+
+const canConnectInCurrentBrowser = (walletName: string, readyState: WalletReadyState) => {
   if (readyState === WalletReadyState.Installed) return true;
   if (readyState === WalletReadyState.Loadable) return true;
+  // On mobile, we can deep-link even if not installed/loadable
+  if (isMobileBrowser() && DEEPLINK_URLS[walletName]) return true;
   return false;
 };
 
 const getWalletHint = (walletName: string, readyState: WalletReadyState) => {
-  if (canConnectInCurrentBrowser(walletName, readyState)) return "Connect now";
+  if (readyState === WalletReadyState.Installed) return "Connect now";
+  if (readyState === WalletReadyState.Loadable) return "Connect now";
 
-  if (isMobileBrowser() && !isInsideWalletBrowser(walletName)) {
-    return "Open this page inside the wallet app browser first";
+  if (isMobileBrowser() && DEEPLINK_URLS[walletName]) {
+    return `Tap to open in ${walletName}`;
   }
 
-  if (walletName === "Phantom") return "Phantom extension or in-app browser required";
-
-  return "Use Solflare extension or the wallet app browser";
+  return `Install the ${walletName} extension`;
 };
 
 const WalletSelectModal = ({ open, onOpenChange }: WalletSelectModalProps) => {
@@ -74,18 +82,20 @@ const WalletSelectModal = ({ open, onOpenChange }: WalletSelectModalProps) => {
     async (walletName: string, readyState: WalletReadyState) => {
       if (connecting) return;
 
-      if (!canConnectInCurrentBrowser(walletName, readyState)) {
-        toast({
-          title: `${walletName} can't connect from this browser`,
-          description:
-            isMobileBrowser() && !isInsideWalletBrowser(walletName)
-              ? `Open Zyra inside ${walletName}'s in-app browser, then try again.`
-              : `${walletName} isn't available in this browser yet.`,
-          variant: "destructive",
-        });
+      // Mobile deep-link: wallet not injected, open the wallet's in-app browser
+      if (
+        isMobileBrowser() &&
+        !isInsideWalletBrowser(walletName) &&
+        readyState !== WalletReadyState.Installed &&
+        readyState !== WalletReadyState.Loadable &&
+        DEEPLINK_URLS[walletName]
+      ) {
+        const appUrl = window.location.href;
+        window.location.href = DEEPLINK_URLS[walletName](appUrl);
         return;
       }
 
+      // Extension or in-app browser: connect directly
       try {
         select(walletName as WalletName);
         await new Promise((resolve) => setTimeout(resolve, 150));
