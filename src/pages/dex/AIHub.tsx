@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import {
   Brain,
   TrendingUp,
@@ -16,50 +16,57 @@ import {
   Eye,
   RefreshCw,
   Loader2,
+  GraduationCap,
+  Send,
+  BookOpen,
+  Lightbulb,
+  ChevronRight,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import DexLayout from "@/components/dex/DexLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-type AITool = "assistant" | "liquidity" | "fraud" | "risk" | "portfolio";
+type AITool = "assistant" | "security" | "portfolio" | "instructor";
 
 const tools: { id: AITool; label: string; icon: typeof Brain; desc: string; gradient: string }[] = [
   { id: "assistant", label: "Trading Assistant", icon: Brain, desc: "AI-powered market signals", gradient: "from-primary/20 to-primary/5" },
-  { id: "liquidity", label: "Liquidity Optimizer", icon: Droplets, desc: "Pool allocation engine", gradient: "from-blue-500/20 to-blue-500/5" },
-  { id: "fraud", label: "Fraud Detection", icon: Shield, desc: "Transaction monitoring", gradient: "from-amber-500/20 to-amber-500/5" },
-  { id: "risk", label: "Risk Analysis", icon: AlertTriangle, desc: "Market anomaly alerts", gradient: "from-red-500/20 to-red-500/5" },
+  { id: "security", label: "Security & Optimization", icon: Shield, desc: "Liquidity, fraud & risk", gradient: "from-amber-500/20 to-amber-500/5" },
   { id: "portfolio", label: "Portfolio Insights", icon: PieChart, desc: "Performance analytics", gradient: "from-violet-500/20 to-violet-500/5" },
+  { id: "instructor", label: "DeFi Academy", icon: GraduationCap, desc: "Learn crypto & DeFi", gradient: "from-emerald-500/20 to-emerald-500/5" },
 ];
 
 /* ── Shared hook to call AI ── */
-function useAITool(tool: AITool) {
+function useAITool(tool: string) {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
+  const fetchData = useCallback(async (question?: string) => {
     setLoading(true);
     setError(null);
     try {
       const { data: result, error: fnError } = await supabase.functions.invoke("ai-hub", {
-        body: { tool },
+        body: { tool, ...(question ? { question } : {}) },
       });
       if (fnError) throw new Error(fnError.message);
       if (result?.error) throw new Error(result.error);
       setData(result);
+      return result;
     } catch (e: any) {
       const msg = e?.message || "AI request failed";
       setError(msg);
       toast.error(msg);
+      return null;
     } finally {
       setLoading(false);
     }
   }, [tool]);
 
   useEffect(() => {
-    fetchData();
-  }, [fetchData]);
+    if (tool !== "instructor") fetchData();
+  }, [fetchData, tool]);
 
   return { data, loading, error, refresh: fetchData };
 }
@@ -150,7 +157,7 @@ const TradingAssistantPanel = () => {
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">Powered by Zyra AI · Live analysis</p>
         </div>
-        <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={refresh}>
+        <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => refresh()}>
           <RefreshCw className="w-3 h-3" />Refresh
         </Button>
       </div>
@@ -192,189 +199,181 @@ const TradingAssistantPanel = () => {
   );
 };
 
-const LiquidityOptimizerPanel = () => {
-  const { data, loading, error, refresh } = useAITool("liquidity");
-  if (loading) return <LoadingState />;
-  if (error) return <ErrorState error={error} onRetry={refresh} />;
-  if (!data) return null;
+/* ── Merged Security & Optimization Panel ── */
 
-  const pools = data.pools || [];
-  const summary = data.summary || {};
+const SecurityOptimizationPanel = () => {
+  const liquidity = useAITool("liquidity");
+  const fraud = useAITool("fraud");
+  const risk = useAITool("risk");
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-display font-bold flex items-center gap-2">
-            <Droplets className="w-5 h-5 text-blue-400" />Liquidity Optimizer
-          </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">AI-powered allocation optimization</p>
-        </div>
-        <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={refresh}>
-          <RefreshCw className="w-3 h-3" />Refresh
-        </Button>
-      </div>
-      <div className="glass rounded-xl overflow-hidden gradient-border">
-        <table className="w-full text-xs">
-          <thead>
-            <tr className="border-b border-border/30 text-muted-foreground">
-              <th className="text-left py-3 px-4 font-medium">Pool</th>
-              <th className="text-right py-3 px-4 font-medium">APR</th>
-              <th className="text-right py-3 px-4 font-medium hidden sm:table-cell">Current</th>
-              <th className="text-right py-3 px-4 font-medium">Optimal</th>
-              <th className="text-right py-3 px-4 font-medium hidden sm:table-cell">Slippage ↓</th>
-              <th className="text-right py-3 px-4 font-medium">Action</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pools.map((p: any) => (
-              <tr key={p.pool} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
-                <td className="py-3 px-4 font-semibold">{p.pool}</td>
-                <td className="text-right py-3 px-4 text-primary font-medium">{p.currentAPR}%</td>
-                <td className="text-right py-3 px-4 text-muted-foreground hidden sm:table-cell">{p.currentAlloc}%</td>
-                <td className="text-right py-3 px-4 font-semibold">{p.optimalAlloc}%</td>
-                <td className="text-right py-3 px-4 text-primary hidden sm:table-cell">-{p.slippageReduction}</td>
-                <td className="text-right py-3 px-4">
-                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${p.action === "Increase" ? "bg-primary/15 text-primary" : p.action === "Decrease" ? "bg-amber-500/15 text-amber-400" : "bg-muted text-muted-foreground"}`}>
-                    {p.action}
-                  </span>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="glass rounded-xl p-4 gradient-border text-center">
-          <p className="text-2xl font-bold text-blue-400">{summary.estimatedSlippageReduction || "N/A"}</p>
-          <p className="text-[10px] text-muted-foreground mt-1">Estimated Slippage Reduction</p>
-        </div>
-        <div className="glass rounded-xl p-4 gradient-border text-center">
-          <p className="text-2xl font-bold text-primary">+{summary.projectedAPRGain || "N/A"}</p>
-          <p className="text-[10px] text-muted-foreground mt-1">Projected APR Gain</p>
-        </div>
-      </div>
-      <Button className="w-full glow-sm gap-2"><Zap className="w-4 h-4" />Apply Optimal Allocation</Button>
-    </div>
-  );
-};
+  const anyLoading = liquidity.loading || fraud.loading || risk.loading;
 
-const FraudDetectionPanel = () => {
-  const { data, loading, error, refresh } = useAITool("fraud");
-  if (loading) return <LoadingState />;
-  if (error) return <ErrorState error={error} onRetry={refresh} />;
-  if (!data) return null;
-
-  const stats = data.stats || {};
-  const alerts = data.alerts || [];
+  const refreshAll = () => {
+    liquidity.refresh();
+    fraud.refresh();
+    risk.refresh();
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-display font-bold flex items-center gap-2">
-            <Shield className="w-5 h-5 text-amber-400" />Fraud Detection
+            <Shield className="w-5 h-5 text-amber-400" />Security & Optimization
           </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">AI-powered real-time monitoring</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Liquidity, fraud detection & risk analysis combined</p>
         </div>
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-primary/10">
             <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
             <span className="text-[10px] text-primary font-semibold">Live</span>
           </div>
-          <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={refresh}>
-            <RefreshCw className="w-3 h-3" />
+          <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={refreshAll} disabled={anyLoading}>
+            <RefreshCw className={`w-3 h-3 ${anyLoading ? "animate-spin" : ""}`} />
           </Button>
         </div>
       </div>
-      <div className="grid grid-cols-3 gap-3">
-        <div className="glass rounded-xl p-3 gradient-border text-center">
-          <p className="text-xl font-bold text-foreground">{stats.txScanned?.toLocaleString()}</p>
-          <p className="text-[10px] text-muted-foreground">TX Scanned (1h)</p>
-        </div>
-        <div className="glass rounded-xl p-3 gradient-border text-center">
-          <p className="text-xl font-bold text-amber-400">{stats.flagged}</p>
-          <p className="text-[10px] text-muted-foreground">Flagged</p>
-        </div>
-        <div className="glass rounded-xl p-3 gradient-border text-center">
-          <p className="text-xl font-bold text-red-400">{stats.blocked}</p>
-          <p className="text-[10px] text-muted-foreground">Blocked</p>
-        </div>
-      </div>
-      <div className="space-y-2">
-        {alerts.map((a: any, i: number) => (
-          <div key={a.id || i} className="glass rounded-xl p-3 gradient-border flex items-center justify-between gap-3 hover:bg-secondary/20 transition-colors">
-            <div className="flex items-center gap-3 min-w-0">
-              <SeverityDot severity={a.severity} />
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-sm font-semibold">{a.type}</span>
-                  <span className="text-[10px] text-muted-foreground">{a.id}</span>
+
+      <Tabs defaultValue="liquidity" className="w-full">
+        <TabsList className="w-full grid grid-cols-3 mb-4">
+          <TabsTrigger value="liquidity" className="text-xs gap-1.5"><Droplets className="w-3 h-3" />Liquidity</TabsTrigger>
+          <TabsTrigger value="fraud" className="text-xs gap-1.5"><Shield className="w-3 h-3" />Fraud</TabsTrigger>
+          <TabsTrigger value="risk" className="text-xs gap-1.5"><AlertTriangle className="w-3 h-3" />Risk</TabsTrigger>
+        </TabsList>
+
+        {/* Liquidity Tab */}
+        <TabsContent value="liquidity">
+          {liquidity.loading ? <LoadingState /> :
+           liquidity.error ? <ErrorState error={liquidity.error} onRetry={() => liquidity.refresh()} /> :
+           liquidity.data ? (
+            <div className="space-y-4">
+              <div className="glass rounded-xl overflow-hidden gradient-border">
+                <table className="w-full text-xs">
+                  <thead>
+                    <tr className="border-b border-border/30 text-muted-foreground">
+                      <th className="text-left py-3 px-4 font-medium">Pool</th>
+                      <th className="text-right py-3 px-4 font-medium">APR</th>
+                      <th className="text-right py-3 px-4 font-medium hidden sm:table-cell">Current</th>
+                      <th className="text-right py-3 px-4 font-medium">Optimal</th>
+                      <th className="text-right py-3 px-4 font-medium">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(liquidity.data.pools || []).map((p: any) => (
+                      <tr key={p.pool} className="border-b border-border/10 hover:bg-secondary/20 transition-colors">
+                        <td className="py-3 px-4 font-semibold">{p.pool}</td>
+                        <td className="text-right py-3 px-4 text-primary font-medium">{p.currentAPR}%</td>
+                        <td className="text-right py-3 px-4 text-muted-foreground hidden sm:table-cell">{p.currentAlloc}%</td>
+                        <td className="text-right py-3 px-4 font-semibold">{p.optimalAlloc}%</td>
+                        <td className="text-right py-3 px-4">
+                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full ${p.action === "Increase" ? "bg-primary/15 text-primary" : p.action === "Decrease" ? "bg-amber-500/15 text-amber-400" : "bg-muted text-muted-foreground"}`}>
+                            {p.action}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {liquidity.data.summary && (
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="glass rounded-xl p-4 gradient-border text-center">
+                    <p className="text-2xl font-bold text-blue-400">{liquidity.data.summary.estimatedSlippageReduction || "N/A"}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">Slippage Reduction</p>
+                  </div>
+                  <div className="glass rounded-xl p-4 gradient-border text-center">
+                    <p className="text-2xl font-bold text-primary">+{liquidity.data.summary.projectedAPRGain || "N/A"}</p>
+                    <p className="text-[10px] text-muted-foreground mt-1">APR Gain</p>
+                  </div>
                 </div>
-                <p className="text-[11px] text-muted-foreground truncate">
-                  {a.address} · {a.timestamp} · {a.severity}
-                </p>
+              )}
+            </div>
+          ) : null}
+        </TabsContent>
+
+        {/* Fraud Tab */}
+        <TabsContent value="fraud">
+          {fraud.loading ? <LoadingState /> :
+           fraud.error ? <ErrorState error={fraud.error} onRetry={() => fraud.refresh()} /> :
+           fraud.data ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-3">
+                <div className="glass rounded-xl p-3 gradient-border text-center">
+                  <p className="text-xl font-bold text-foreground">{fraud.data.stats?.txScanned?.toLocaleString()}</p>
+                  <p className="text-[10px] text-muted-foreground">TX Scanned (1h)</p>
+                </div>
+                <div className="glass rounded-xl p-3 gradient-border text-center">
+                  <p className="text-xl font-bold text-amber-400">{fraud.data.stats?.flagged}</p>
+                  <p className="text-[10px] text-muted-foreground">Flagged</p>
+                </div>
+                <div className="glass rounded-xl p-3 gradient-border text-center">
+                  <p className="text-xl font-bold text-red-400">{fraud.data.stats?.blocked}</p>
+                  <p className="text-[10px] text-muted-foreground">Blocked</p>
+                </div>
+              </div>
+              <div className="space-y-2">
+                {(fraud.data.alerts || []).map((a: any, i: number) => (
+                  <div key={a.id || i} className="glass rounded-xl p-3 gradient-border flex items-center justify-between gap-3 hover:bg-secondary/20 transition-colors">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <SeverityDot severity={a.severity} />
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold">{a.type}</span>
+                          <span className="text-[10px] text-muted-foreground">{a.id}</span>
+                        </div>
+                        <p className="text-[11px] text-muted-foreground truncate">
+                          {a.address} · {a.timestamp} · {a.severity}
+                        </p>
+                      </div>
+                    </div>
+                    <StatusBadge status={a.status} />
+                  </div>
+                ))}
               </div>
             </div>
-            <StatusBadge status={a.status} />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-};
+          ) : null}
+        </TabsContent>
 
-const RiskAnalysisPanel = () => {
-  const { data, loading, error, refresh } = useAITool("risk");
-  if (loading) return <LoadingState />;
-  if (error) return <ErrorState error={error} onRetry={refresh} />;
-  if (!data) return null;
-
-  const metrics = data.metrics || [];
-
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-lg font-display font-bold flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5 text-red-400" />Risk Analysis
-          </h2>
-          <p className="text-xs text-muted-foreground mt-0.5">AI multi-factor anomaly detection</p>
-        </div>
-        <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={refresh}>
-          <RefreshCw className="w-3 h-3" />
-        </Button>
-      </div>
-      <div className="glass rounded-xl p-4 gradient-border">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Overall Risk Level</span>
-          <span className={`text-sm font-bold ${
-            data.overallLevel === "Low" ? "text-primary" :
-            data.overallLevel === "Moderate" ? "text-amber-400" :
-            data.overallLevel === "High" ? "text-red-400" : "text-red-500"
-          }`}>{data.overallLevel}</span>
-        </div>
-        <div className="w-full bg-secondary/50 rounded-full h-3 overflow-hidden">
-          <div className="h-3 rounded-full bg-gradient-to-r from-primary via-amber-500 to-red-500 transition-all" style={{ width: `${data.overallPercent || 50}%` }} />
-        </div>
-        <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
-          <span>Low</span><span>Moderate</span><span>High</span><span>Extreme</span>
-        </div>
-      </div>
-      <div className="space-y-3">
-        {metrics.map((m: any, i: number) => (
-          <div key={m.metric || i} className="glass rounded-xl p-4 gradient-border">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm font-semibold">{m.metric}</span>
-              <span className={`text-xs font-bold ${m.status === "healthy" ? "text-primary" : m.status === "elevated" ? "text-amber-400" : m.status === "critical" ? "text-red-400" : "text-muted-foreground"}`}>
-                {m.value}
-              </span>
+        {/* Risk Tab */}
+        <TabsContent value="risk">
+          {risk.loading ? <LoadingState /> :
+           risk.error ? <ErrorState error={risk.error} onRetry={() => risk.refresh()} /> :
+           risk.data ? (
+            <div className="space-y-4">
+              <div className="glass rounded-xl p-4 gradient-border">
+                <div className="flex items-center justify-between mb-3">
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Overall Risk Level</span>
+                  <span className={`text-sm font-bold ${
+                    risk.data.overallLevel === "Low" ? "text-primary" :
+                    risk.data.overallLevel === "Moderate" ? "text-amber-400" :
+                    risk.data.overallLevel === "High" ? "text-red-400" : "text-red-500"
+                  }`}>{risk.data.overallLevel}</span>
+                </div>
+                <div className="w-full bg-secondary/50 rounded-full h-3 overflow-hidden">
+                  <div className="h-3 rounded-full bg-gradient-to-r from-primary via-amber-500 to-red-500 transition-all" style={{ width: `${risk.data.overallPercent || 50}%` }} />
+                </div>
+                <div className="flex justify-between text-[10px] text-muted-foreground mt-1">
+                  <span>Low</span><span>Moderate</span><span>High</span><span>Extreme</span>
+                </div>
+              </div>
+              <div className="space-y-3">
+                {(risk.data.metrics || []).map((m: any, i: number) => (
+                  <div key={m.metric || i} className="glass rounded-xl p-4 gradient-border">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-semibold">{m.metric}</span>
+                      <span className={`text-xs font-bold ${m.status === "healthy" ? "text-primary" : m.status === "elevated" ? "text-amber-400" : m.status === "critical" ? "text-red-400" : "text-muted-foreground"}`}>
+                        {m.value}
+                      </span>
+                    </div>
+                    <RiskBar value={m.value} status={m.status} />
+                    <p className="text-[11px] text-muted-foreground mt-2">{m.detail}</p>
+                  </div>
+                ))}
+              </div>
             </div>
-            <RiskBar value={m.value} status={m.status} />
-            <p className="text-[11px] text-muted-foreground mt-2">{m.detail}</p>
-          </div>
-        ))}
-      </div>
+          ) : null}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };
@@ -397,8 +396,8 @@ const PortfolioInsightsPanel = () => {
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">AI-powered portfolio analytics</p>
         </div>
-        <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={refresh}>
-          <RefreshCw className="w-3 h-3" />
+        <Button size="sm" variant="outline" className="gap-1.5 text-xs" onClick={() => refresh()}>
+          <RefreshCw className="w-3 h-3" />Refresh
         </Button>
       </div>
       <div className="grid grid-cols-2 gap-3">
@@ -461,14 +460,199 @@ const PortfolioInsightsPanel = () => {
   );
 };
 
+/* ── DeFi Academy / Instructor Panel ── */
+
+const suggestedQuestions = [
+  "What is a DEX and how does it work?",
+  "Explain liquidity pools in simple terms",
+  "What is staking and how do I earn rewards?",
+  "How do I protect my crypto wallet?",
+  "What is impermanent loss?",
+  "How do gas fees work on Solana?",
+];
+
+type InstructorMessage = {
+  role: "user" | "ai";
+  content: string;
+  relatedTopics?: string[];
+  difficulty?: string;
+  keyTakeaways?: string[];
+};
+
+const InstructorPanel = () => {
+  const [messages, setMessages] = useState<InstructorMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [loading, setLoading] = useState(false);
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
+  }, [messages]);
+
+  const askQuestion = async (question: string) => {
+    if (!question.trim() || loading) return;
+    setInput("");
+    setMessages((prev) => [...prev, { role: "user", content: question }]);
+    setLoading(true);
+
+    try {
+      const { data, error } = await supabase.functions.invoke("ai-hub", {
+        body: { tool: "instructor", question },
+      });
+      if (error) throw new Error(error.message);
+      if (data?.error) throw new Error(data.error);
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "ai",
+          content: data.answer || "I couldn't generate a response. Please try again.",
+          relatedTopics: data.relatedTopics || [],
+          difficulty: data.difficulty || "beginner",
+          keyTakeaways: data.keyTakeaways || [],
+        },
+      ]);
+    } catch (e: any) {
+      toast.error(e?.message || "Failed to get response");
+      setMessages((prev) => [
+        ...prev,
+        { role: "ai", content: "Sorry, I encountered an error. Please try again." },
+      ]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    askQuestion(input);
+  };
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <h2 className="text-lg font-display font-bold flex items-center gap-2">
+          <GraduationCap className="w-5 h-5 text-emerald-400" />DeFi Academy
+        </h2>
+        <p className="text-xs text-muted-foreground mt-0.5">Your personal AI instructor for crypto & DeFi</p>
+      </div>
+
+      {messages.length === 0 ? (
+        <div className="space-y-4">
+          <div className="glass rounded-xl p-6 gradient-border text-center">
+            <BookOpen className="w-10 h-10 text-emerald-400 mx-auto mb-3" />
+            <h3 className="text-base font-semibold mb-1">Welcome to DeFi Academy</h3>
+            <p className="text-xs text-muted-foreground max-w-sm mx-auto">
+              Ask me anything about cryptocurrency, blockchain, DeFi, trading, or security. I'll explain it in simple terms with real examples.
+            </p>
+          </div>
+          <div>
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-3 flex items-center gap-1.5">
+              <Lightbulb className="w-3 h-3 text-amber-400" />Popular Questions
+            </p>
+            <div className="grid gap-2">
+              {suggestedQuestions.map((q) => (
+                <button
+                  key={q}
+                  onClick={() => askQuestion(q)}
+                  className="glass rounded-xl p-3 gradient-border text-left text-sm hover:bg-secondary/30 transition-colors flex items-center justify-between group"
+                >
+                  <span className="text-muted-foreground group-hover:text-foreground transition-colors">{q}</span>
+                  <ChevronRight className="w-4 h-4 text-muted-foreground/50 group-hover:text-primary transition-colors shrink-0" />
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div ref={scrollRef} className="space-y-4 max-h-[60vh] overflow-y-auto pr-1 scrollbar-none">
+          {messages.map((msg, i) => (
+            <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+              <div className={`max-w-[85%] rounded-xl p-4 ${
+                msg.role === "user"
+                  ? "bg-primary/15 text-foreground"
+                  : "glass gradient-border"
+              }`}>
+                {msg.role === "user" ? (
+                  <p className="text-sm">{msg.content}</p>
+                ) : (
+                  <div className="space-y-3">
+                    <div className="text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">{msg.content}</div>
+                    {msg.keyTakeaways && msg.keyTakeaways.length > 0 && (
+                      <div className="border-t border-border/20 pt-3">
+                        <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-2 flex items-center gap-1">
+                          <Sparkles className="w-3 h-3 text-primary" />Key Takeaways
+                        </p>
+                        {msg.keyTakeaways.map((t, j) => (
+                          <div key={j} className="flex items-start gap-2 text-xs mb-1">
+                            <CheckCircle2 className="w-3 h-3 text-primary shrink-0 mt-0.5" />
+                            <span>{t}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {msg.relatedTopics && msg.relatedTopics.length > 0 && (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {msg.relatedTopics.map((topic) => (
+                          <button
+                            key={topic}
+                            onClick={() => askQuestion(`Tell me about ${topic}`)}
+                            className="text-[10px] font-medium px-2 py-1 rounded-full bg-primary/10 text-primary hover:bg-primary/20 transition-colors"
+                          >
+                            {topic} →
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    {msg.difficulty && (
+                      <span className={`inline-block text-[10px] font-semibold px-2 py-0.5 rounded-full ${
+                        msg.difficulty === "beginner" ? "bg-emerald-500/15 text-emerald-400" :
+                        msg.difficulty === "intermediate" ? "bg-amber-500/15 text-amber-400" :
+                        "bg-red-500/15 text-red-400"
+                      }`}>{msg.difficulty}</span>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+          {loading && (
+            <div className="flex justify-start">
+              <div className="glass rounded-xl p-4 gradient-border">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 text-emerald-400 animate-spin" />
+                  <span className="text-xs text-muted-foreground">Thinking...</span>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="flex gap-2">
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          placeholder="Ask anything about crypto & DeFi..."
+          className="flex-1 bg-secondary/50 border border-border/30 rounded-xl px-4 py-2.5 text-sm placeholder:text-muted-foreground/50 focus:outline-none focus:ring-1 focus:ring-primary/50"
+          disabled={loading}
+        />
+        <Button type="submit" size="icon" disabled={!input.trim() || loading} className="rounded-xl shrink-0 glow-sm">
+          <Send className="w-4 h-4" />
+        </Button>
+      </form>
+    </div>
+  );
+};
+
 /* ── Main page ── */
 
 const panelMap: Record<AITool, () => JSX.Element> = {
   assistant: TradingAssistantPanel,
-  liquidity: LiquidityOptimizerPanel,
-  fraud: FraudDetectionPanel,
-  risk: RiskAnalysisPanel,
+  security: SecurityOptimizationPanel,
   portfolio: PortfolioInsightsPanel,
+  instructor: InstructorPanel,
 };
 
 const AIHub = () => {
@@ -484,7 +668,7 @@ const AIHub = () => {
           </div>
           <h1 className="text-2xl md:text-3xl font-display font-bold">AI Trading Suite</h1>
           <p className="text-sm text-muted-foreground mt-1 max-w-md mx-auto">
-            Five AI engines analyzing real market data to optimize your trading and protect your assets.
+            AI-powered market analysis, security monitoring, and DeFi education — all in one place.
           </p>
         </div>
 
