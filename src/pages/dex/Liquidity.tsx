@@ -614,7 +614,7 @@ const Liquidity = () => {
                           variant="outline"
                           size="sm"
                           className="text-xs shrink-0 border-primary/20 rounded-lg"
-                          onClick={() => openWalletModal(true)}
+                          onClick={() => openWalletConnect()}
                         >
                           Connect Wallet
                         </Button>

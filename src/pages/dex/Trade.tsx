@@ -630,7 +630,7 @@ const Trade = () => {
                   <LogIn className="w-4 h-4 mr-2" /> Sign In to Trade
                 </Button>
               ) : !connected ? (
-                <Button className="w-full h-11 font-semibold glow-sm" onClick={() => openWalletModal(true)}>
+                <Button className="w-full h-11 font-semibold glow-sm" onClick={() => openWalletConnect()}>
                   Connect Wallet
                 </Button>
               ) : (
