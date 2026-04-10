@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 
 /* ── Token registry ────────────────────────────────────── */
 const TOKENS: Record<string, { symbol: string; mint: string; decimals: number; icon: string; cgId?: string }> = {
-  ZRA:  { symbol: "ZRA",  mint: "ZRA_PLACEHOLDER_MINT", decimals: 9, icon: "💎" },
+  ZRA:  { symbol: "ZRA",  mint: "3Jz9qH8kB8EyJJu8W1Mj5AS4GX54xJFfcnNNuWZ35bZE", decimals: 9, icon: "💎" },
   SOL:  { symbol: "SOL",  mint: "So11111111111111111111111111111111111111112", decimals: 9, icon: "◎", cgId: "solana" },
   USDC: { symbol: "USDC", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6, icon: "💲", cgId: "usd-coin" },
   USDT: { symbol: "USDT", mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", decimals: 6, icon: "💵", cgId: "tether" },

@@ -32,7 +32,7 @@ const WalletButton = () => {
 
   const openExplorer = useCallback(() => {
     if (base58) {
-      window.open(`https://solscan.io/account/${base58}?cluster=devnet`, "_blank");
+      window.open(`https://solscan.io/account/${base58}`, "_blank");
     }
   }, [base58]);
 
