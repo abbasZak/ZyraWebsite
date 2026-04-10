@@ -1,19 +1,22 @@
-import { useCallback } from "react";
-import { useWallet } from "@solana/wallet-adapter-react";
+import { useCallback, useMemo } from "react";
 import { WalletReadyState, type WalletName } from "@solana/wallet-adapter-base";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { AlertTriangle, Loader2, Wallet } from "lucide-react";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
 } from "@/components/ui/dialog";
-import { ExternalLink } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
 
 interface WalletSelectModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
+
+const SUPPORTED_WALLETS = new Set(["Phantom", "Solflare"]);
 
 const isMobileBrowser = () =>
   typeof window !== "undefined" &&
@@ -21,169 +24,137 @@ const isMobileBrowser = () =>
 
 const isInsideWalletBrowser = (walletName: string) => {
   if (typeof window === "undefined") return false;
+
+  const win = window as Window & {
+    phantom?: { solana?: { isPhantom?: boolean } };
+    solana?: { isPhantom?: boolean };
+    solflare?: { isSolflare?: boolean };
+  };
   const ua = navigator.userAgent;
 
   if (walletName === "Phantom") {
-    const w = window as any;
-    return Boolean(w.phantom?.solana?.isPhantom || w.solana?.isPhantom) || /Phantom/i.test(ua);
+    return Boolean(win.phantom?.solana?.isPhantom || win.solana?.isPhantom) || /Phantom/i.test(ua);
   }
+
   if (walletName === "Solflare") {
-    const w = window as any;
-    return Boolean(w.solflare?.isSolflare) || /Solflare/i.test(ua);
+    return Boolean(win.solflare?.isSolflare) || /Solflare/i.test(ua);
   }
+
   return false;
 };
 
-/** Build a universal / deep link that opens the current page inside the wallet's in-app browser */
-const buildMobileDeepLink = (walletName: string): string | null => {
-  const currentUrl = window.location.href;
-  const returnUrl = encodeURIComponent(currentUrl);
-  const ref = encodeURIComponent(window.location.origin);
+const canConnectInCurrentBrowser = (walletName: string, readyState: WalletReadyState) => {
+  if (readyState === WalletReadyState.Installed) return true;
 
-  switch (walletName) {
-    case "Phantom":
-      return `https://phantom.app/ul/browse/${returnUrl}?ref=${ref}`;
-    case "Solflare":
-      return `https://solflare.com/ul/v1/browse/${returnUrl}?ref=${ref}`;
-    default:
-      return null;
+  if (walletName === "Solflare" && !isMobileBrowser() && readyState === WalletReadyState.Loadable) {
+    return true;
   }
+
+  return false;
 };
 
-const WALLET_META: Record<string, { color: string; description: string }> = {
-  Phantom: {
-    color: "from-[#ab9ff2] to-[#7c3aed]",
-    description: "Most popular Solana wallet",
-  },
-  Solflare: {
-    color: "from-[#fc9936] to-[#e8601c]",
-    description: "Full-featured Solana wallet",
-  },
+const getWalletHint = (walletName: string, readyState: WalletReadyState) => {
+  if (canConnectInCurrentBrowser(walletName, readyState)) return "Connect now";
+
+  if (isMobileBrowser() && !isInsideWalletBrowser(walletName)) {
+    return "Open this page inside the wallet app browser first";
+  }
+
+  if (walletName === "Phantom") return "Phantom extension or in-app browser required";
+
+  return "Use Solflare extension or the wallet app browser";
 };
 
 const WalletSelectModal = ({ open, onOpenChange }: WalletSelectModalProps) => {
-  const { wallets, select, connect, connected, connecting } = useWallet();
+  const { wallets, select, connect, connecting } = useWallet();
+  const { toast } = useToast();
+
+  const supportedWallets = useMemo(
+    () => wallets.filter((wallet) => SUPPORTED_WALLETS.has(wallet.adapter.name)),
+    [wallets]
+  );
 
   const handleSelect = useCallback(
     async (walletName: string, readyState: WalletReadyState) => {
-      const isMobile = isMobileBrowser();
-      const isInside = isInsideWalletBrowser(walletName);
+      if (connecting) return;
 
-      // On mobile and NOT inside this wallet's browser → deep-link to the app
-      if (isMobile && !isInside) {
-        const deepLink = buildMobileDeepLink(walletName);
-        if (deepLink) {
-          window.location.href = deepLink;
-          return;
-        }
+      if (!canConnectInCurrentBrowser(walletName, readyState)) {
+        toast({
+          title: `${walletName} can't connect from this browser`,
+          description:
+            isMobileBrowser() && !isInsideWalletBrowser(walletName)
+              ? `Open Zyra inside ${walletName}'s in-app browser, then try again.`
+              : `${walletName} isn't available in this browser yet.`,
+          variant: "destructive",
+        });
+        return;
       }
 
-      // Wallet is available (desktop extension or inside wallet browser)
-      select(walletName as WalletName);
-
-      if (
-        readyState === WalletReadyState.Installed ||
-        readyState === WalletReadyState.Loadable
-      ) {
-        try {
-          // Small delay to let adapter register after select
-          await new Promise((r) => setTimeout(r, 200));
-          await connect();
-          onOpenChange(false);
-        } catch (err) {
-          console.error(`${walletName} connection failed:`, err);
-        }
+      try {
+        select(walletName as WalletName);
+        await new Promise((resolve) => setTimeout(resolve, 150));
+        await connect();
+        onOpenChange(false);
+      } catch (error: any) {
+        console.error(`${walletName} connection failed`, error);
+        toast({
+          title: `${walletName} connection failed`,
+          description: error?.message || "Approve the connection in your wallet and try again.",
+          variant: "destructive",
+        });
       }
     },
-    [select, connect, onOpenChange]
-  );
-
-  // Filter to supported wallets
-  const supportedWallets = wallets.filter((w) =>
-    Object.keys(WALLET_META).includes(w.adapter.name)
+    [connect, connecting, onOpenChange, select, toast]
   );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md border-primary/20 bg-background/95 backdrop-blur-xl">
+      <DialogContent className="sm:max-w-md border-border/60 bg-background/95">
         <DialogHeader>
-          <DialogTitle className="text-lg font-bold text-foreground">
-            Connect Wallet
-          </DialogTitle>
-          <DialogDescription className="text-muted-foreground text-sm">
-            Choose a wallet to connect to Zyra DEX
+          <DialogTitle className="text-lg font-bold">Connect Wallet</DialogTitle>
+          <DialogDescription>
+            Choose a wallet to connect. Automatic mobile redirects have been removed.
           </DialogDescription>
         </DialogHeader>
 
-        <div className="flex flex-col gap-3 mt-2">
-          {supportedWallets.map((w) => {
-            const meta = WALLET_META[w.adapter.name];
-            const isInstalled =
-              w.readyState === WalletReadyState.Installed ||
-              w.readyState === WalletReadyState.Loadable;
-            const isMobile = isMobileBrowser();
-            const hasDeepLink = !!buildMobileDeepLink(w.adapter.name);
+        <div className="space-y-3">
+          {supportedWallets.map(({ adapter, readyState }) => {
+            const canConnect = canConnectInCurrentBrowser(adapter.name, readyState);
+            const detected = readyState === WalletReadyState.Installed;
 
             return (
               <button
-                key={w.adapter.name}
-                onClick={() => handleSelect(w.adapter.name, w.readyState)}
+                key={adapter.name}
+                type="button"
+                onClick={() => void handleSelect(adapter.name, readyState)}
                 disabled={connecting}
-                className="group relative flex items-center gap-4 w-full p-4 rounded-xl border border-border/50 
-                           hover:border-primary/40 bg-card/50 hover:bg-card/80 transition-all duration-200
-                           disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex w-full items-center gap-3 rounded-xl border border-border/60 bg-card/50 p-4 text-left transition-colors hover:border-primary/40 hover:bg-secondary/20 disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {/* Gradient glow on hover */}
-                <div
-                  className={`absolute inset-0 rounded-xl bg-gradient-to-r ${meta?.color ?? "from-primary to-primary"} 
-                              opacity-0 group-hover:opacity-[0.06] transition-opacity`}
-                />
-
-                {/* Wallet icon */}
-                <div className="relative w-10 h-10 rounded-lg overflow-hidden bg-background/50 flex items-center justify-center shrink-0">
-                  <img
-                    src={w.adapter.icon}
-                    alt={w.adapter.name}
-                    className="w-8 h-8"
-                  />
-                </div>
-
-                {/* Info */}
-                <div className="relative flex-1 text-left">
+                <img src={adapter.icon} alt={`${adapter.name} logo`} className="h-10 w-10 rounded-lg" />
+                <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <span className="font-semibold text-foreground text-sm">
-                      {w.adapter.name}
+                    <span className="font-semibold text-foreground">{adapter.name}</span>
+                    <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-muted-foreground">
+                      {detected ? "Detected" : canConnect ? "Ready" : "Manual"}
                     </span>
-                    {isInstalled && (
-                      <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-primary/10 text-primary font-medium">
-                        Detected
-                      </span>
-                    )}
                   </div>
-                  <p className="text-xs text-muted-foreground mt-0.5">
-                    {meta?.description}
-                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">{getWalletHint(adapter.name, readyState)}</p>
                 </div>
-
-                {/* Arrow / deep-link indicator */}
-                <div className="relative text-muted-foreground group-hover:text-primary transition-colors">
-                  {isMobile && hasDeepLink && !isInstalled ? (
-                    <ExternalLink className="w-4 h-4" />
-                  ) : (
-                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-                    </svg>
-                  )}
-                </div>
+                {connecting ? (
+                  <Loader2 className="h-4 w-4 animate-spin text-primary" />
+                ) : (
+                  <Wallet className="h-4 w-4 text-muted-foreground" />
+                )}
               </button>
             );
           })}
         </div>
 
         {isMobileBrowser() && (
-          <p className="text-[11px] text-muted-foreground text-center mt-2">
-            You'll be redirected to the wallet app to approve the connection
-          </p>
+          <div className="flex items-start gap-2 rounded-lg border border-border/60 bg-secondary/20 p-3 text-xs text-muted-foreground">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+            <p>On mobile, open Zyra inside Phantom or Solflare first, then connect normally from there.</p>
+          </div>
         )}
       </DialogContent>
     </Dialog>

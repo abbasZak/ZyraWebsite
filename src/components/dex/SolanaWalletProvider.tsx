@@ -1,10 +1,8 @@
 import { useMemo, type ReactNode } from "react";
 import { ConnectionProvider, WalletProvider } from "@solana/wallet-adapter-react";
-import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { SolflareWalletAdapter } from "@solana/wallet-adapter-solflare";
-
-import "@solana/wallet-adapter-react-ui/styles.css";
+import { DexWalletConnectProvider } from "./DexWalletConnectProvider";
 
 interface Props {
   children: ReactNode;
@@ -25,8 +23,8 @@ const SolanaWalletProvider = ({ children }: Props) => {
 
   return (
     <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
-        <WalletModalProvider>{children}</WalletModalProvider>
+      <WalletProvider wallets={wallets}>
+        <DexWalletConnectProvider>{children}</DexWalletConnectProvider>
       </WalletProvider>
     </ConnectionProvider>
   );
