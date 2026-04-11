@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Zyra-Website
 Zyra Token Website
 Welcome to ZYRA Exchange's project for colloseum frontier hackathon.
@@ -19,3 +20,8 @@ Hopefully we are able to achieve much more before the competition comes to an en
 Please note that all these features were achieved abd successfully built between yesterday 9th April and today 10th April 2026.
 
 We hope to achieve more by the end of this competition. Thank you very much
+=======
+# Welcome to your Lovable project
+
+TODO: Document your project here
+>>>>>>> 95d05da (template: vite_react_shadcn_ts_2026-03-20)
