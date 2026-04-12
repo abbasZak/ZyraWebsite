@@ -2,8 +2,11 @@ import { motion } from "framer-motion";
 import { FileText, ArrowDown, Rocket } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import PresaleCountdown from "@/components/PresaleCountdown";
+import { useNavigate } from "react-router-dom";
 
 const HeroSection = () => {
+  const navigate = useNavigate();
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background effects */}
@@ -85,7 +88,7 @@ const HeroSection = () => {
               className="text-base px-8 h-12 font-semibold glow-sm hover:glow-md transition-shadow"
               asChild
             >
-              <a href="/dex">
+              <a onClick={() => navigate("/dex")}>
                 <Rocket className="mr-2 w-4 h-4" />
                 Launch DEX
               </a>
@@ -104,7 +107,7 @@ const HeroSection = () => {
               className="text-base px-8 h-12 font-semibold border-border/50 hover:border-primary/30 hover:bg-primary/5 transition-all"
               asChild
             >
-              <a href="/whitepaper">
+              <a onClick={() => navigate("/whitepaper")}>
                 <FileText className="mr-2 w-4 h-4" />
                 Read Whitepaper
               </a>
