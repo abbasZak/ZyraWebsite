@@ -147,3 +147,28 @@
     border-radius: inherit;
   }
 }
+
+/* Wallet Modal Styles */
+.wallet-adapter-modal {
+  z-index: 10000 !important;
+}
+
+.wallet-adapter-modal-wrapper {
+  background: #1a1a1a !important;
+  border-radius: 24px !important;
+}
+
+.wallet-adapter-button {
+  background: #00FFB2 !important;
+  color: #000000 !important;
+}
+
+.wallet-adapter-button:hover {
+  background: #00cc8f !important;
+}
+
+/* Ensure modal is visible */
+.wallet-adapter-modal.fade-in {
+  opacity: 1 !important;
+  visibility: visible !important;
+}

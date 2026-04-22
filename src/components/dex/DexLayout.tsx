@@ -12,9 +12,10 @@ import {
   X,
   HelpCircle,
 } from "lucide-react";
-import WalletButton from "./WalletButton";
+import SimpleWalletButton from "./SimpleWalletButton";
 import OnboardingTour, { useOnboardingTour } from "./OnboardingTour";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useWallet } from "@solana/wallet-adapter-react";
 import zyraLogo from "@/assets/zyra-logo.png";
 
 const navItems = [
@@ -29,8 +30,10 @@ const navItems = [
 const DexLayout = ({ children }: { children: React.ReactNode }) => {
   const location = useLocation();
   const { user } = useAuth();
+  const { connected } = useWallet(); // Add this to monitor wallet connection
   const { showTour, startTour, completeTour, shouldShowTour } = useOnboardingTour();
   const [hasTriggeredTour, setHasTriggeredTour] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Auto-trigger tour for new users
   useEffect(() => {
@@ -53,6 +56,11 @@ const DexLayout = ({ children }: { children: React.ReactNode }) => {
     return () => window.removeEventListener("keydown", handleKey);
   }, [showTour, completeTour]);
 
+  // Close mobile menu on route change
+  useEffect(() => {
+    setMobileMenuOpen(false);
+  }, [location.pathname]);
+
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* Top bar */}
@@ -63,6 +71,8 @@ const DexLayout = ({ children }: { children: React.ReactNode }) => {
             <span className="text-base font-display font-bold tracking-tight hidden sm:inline">Zyra</span>
             <span className="text-[10px] px-1.5 py-0.5 rounded bg-primary/10 text-primary font-semibold uppercase tracking-widest hidden sm:inline">DEX</span>
           </Link>
+          
+          {/* Desktop Navigation */}
           <nav className="hidden md:flex items-center gap-0.5">
             {navItems.map((item) => {
               const active = location.pathname === item.href;
@@ -84,7 +94,9 @@ const DexLayout = ({ children }: { children: React.ReactNode }) => {
             })}
           </nav>
         </div>
+
         <div className="flex items-center gap-2">
+          {/* Help/Tour Button */}
           <button
             onClick={startTour}
             className="hidden md:flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-secondary/50"
@@ -92,17 +104,90 @@ const DexLayout = ({ children }: { children: React.ReactNode }) => {
           >
             <HelpCircle className="w-3.5 h-3.5" />
           </button>
-          <Link to="/" className="hidden md:flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-secondary/50">
+          
+          {/* Home Link */}
+          <Link 
+            to="/" 
+            className="hidden md:flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors px-2 py-1 rounded-lg hover:bg-secondary/50"
+          >
             <Home className="w-3 h-3" />
             Home
           </Link>
+          
+          {/* Wallet Button - Wrapped with data-tour attribute */}
           <div data-tour="wallet">
-            <WalletButton />
+            <SimpleWalletButton />
           </div>
+
+          {/* Mobile Menu Button */}
+          <button
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            className="md:hidden p-2 rounded-lg hover:bg-secondary/50 transition-colors"
+          >
+            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+          </button>
         </div>
       </header>
 
-      {/* Mobile bottom navigation — always visible */}
+      {/* Mobile Navigation Drawer */}
+      {mobileMenuOpen && (
+        <div className="fixed inset-0 z-30 md:hidden">
+          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setMobileMenuOpen(false)} />
+          <nav className="fixed top-14 right-0 bottom-0 w-64 bg-background border-l border-border shadow-xl p-4 overflow-y-auto">
+            <div className="flex flex-col gap-2">
+              {navItems.map((item) => {
+                const active = location.pathname === item.href;
+                return (
+                  <Link
+                    key={item.label}
+                    to={item.href}
+                    data-tour={item.tourId}
+                    className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
+                      active
+                        ? "bg-primary/10 text-primary font-medium"
+                        : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                    }`}
+                    onClick={() => setMobileMenuOpen(false)}
+                  >
+                    <item.icon className="w-5 h-5" />
+                    <span>{item.label}</span>
+                  </Link>
+                );
+              })}
+              <Link
+                to="/"
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors"
+                onClick={() => setMobileMenuOpen(false)}
+              >
+                <Home className="w-5 h-5" />
+                <span>Home</span>
+              </Link>
+              <button
+                onClick={() => {
+                  startTour();
+                  setMobileMenuOpen(false);
+                }}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-secondary/50 transition-colors w-full text-left"
+              >
+                <HelpCircle className="w-5 h-5" />
+                <span>Take Tour</span>
+              </button>
+            </div>
+            
+            {/* Wallet Connection Status in Mobile Menu */}
+            {connected && (
+              <div className="mt-4 pt-4 border-t border-border">
+                <div className="px-3 py-2">
+                  <p className="text-xs text-muted-foreground">Wallet Status</p>
+                  <p className="text-sm font-medium text-green-500">Connected</p>
+                </div>
+              </div>
+            )}
+          </nav>
+        </div>
+      )}
+
+      {/* Mobile bottom navigation */}
       <nav className="fixed bottom-0 left-0 right-0 z-40 glass-strong border-t border-border/30 md:hidden">
         <div className="flex items-center justify-around h-14 px-1">
           {navItems.map((item) => {

@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Connect Phantom</title>
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background: #1a1a1a;
+      color: white;
+    }
+    .container {
+      text-align: center;
+      padding: 20px;
+    }
+    button {
+      background: #00FFB2;
+      color: black;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-top: 20px;
+    }
+    button:hover {
+      background: #00cc8f;
+    }
+    .status {
+      margin-top: 20px;
+      font-size: 14px;
+      color: #888;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Connect Phantom Wallet</h2>
+    <button id="connectBtn">Connect Wallet</button>
+    <div class="status" id="status">Click connect to continue</div>
+  </div>
+
+  <script>
+    const connectBtn = document.getElementById('connectBtn');
+    const statusDiv = document.getElementById('status');
+    
+    connectBtn.addEventListener('click', async () => {
+      statusDiv.textContent = 'Connecting...';
+      
+      try {
+        if (!window.solana || !window.solana.isPhantom) {
+          statusDiv.textContent = 'Phantom not installed. Installing...';
+          window.open('https://phantom.app/', '_blank');
+          return;
+        }
+        
+        const response = await window.solana.connect();
+        if (response.publicKey) {
+          const publicKey = response.publicKey.toString();
+          statusDiv.textContent = 'Connected! Closing...';
+          
+          // Send message to parent window
+          window.opener.postMessage({
+            type: 'PHANTOM_CONNECTED',
+            publicKey: publicKey
+          }, '*');
+          
+          // Close popup after 1 second
+          setTimeout(() => window.close(), 1000);
+        }
+      } catch (err) {
+        console.error(err);
+        statusDiv.textContent = 'Connection failed. Please try again.';
+      }
+    });
+  </script>
+</body>
+</html>

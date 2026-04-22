@@ -40,11 +40,109 @@
       "foundingDate": "2025"
     }
     </script>
+
+    <script>
+      // Fix for Phantom extension
+      window.addEventListener('load', () => {
+        if (window?.solana?.isPhantom) {
+          console.log('Phantom detected');
+        }
+      });
+      
+      // Suppress service worker errors
+      window.addEventListener('error', (e) => {
+        if (e.message?.includes('Could not establish connection')) {
+          e.preventDefault();
+          return false;
+        }
+      });
+    </script>
     <meta property="og:title" content="Zyra — Decentralized Exchange for Africa">
   <meta name="twitter:title" content="Zyra — Decentralized Exchange for Africa">
   <meta property="og:description" content="Zyra is a non-custodial DEX built for emerging markets. Trade crypto directly from your wallet with lower fees, AI trading tools, and community governance.">
   <meta name="twitter:description" content="Zyra is a non-custodial DEX built for emerging markets. Trade crypto directly from your wallet with lower fees, AI trading tools, and community governance.">
   <link rel="icon" type="image/x-icon" href="/favicon.ico">
+
+  <style>
+      /* Ensure wallet modal appears above everything */
+      .wallet-adapter-modal {
+        z-index: 1000 !important;
+      }
+    </style>
+
+     <script>
+      // Ensure Phantom is properly initialized
+      window.addEventListener('load', function() {
+        console.log("Page loaded, checking for Phantom...");
+        
+        // Function to check Phantom
+        function checkPhantom() {
+          if (window.solana && window.solana.isPhantom) {
+            console.log("✅ Phantom detected!", window.solana.version);
+            window.dispatchEvent(new CustomEvent('phantom-ready'));
+          } else {
+            console.log("⏳ Waiting for Phantom...");
+            setTimeout(checkPhantom, 500);
+          }
+        }
+        
+        checkPhantom();
+      });
+      
+      // Debug function exposed to console
+      window.debugPhantom = function() {
+        console.log("Phantom Debug:", {
+          exists: !!window.solana,
+          isPhantom: window.solana?.isPhantom,
+          version: window.solana?.version,
+          publicKey: window.solana?.publicKey?.toString(),
+          isConnected: window.solana?.isConnected
+        });
+      };
+    </script>
+
+    <script>
+      // Wait for Phantom to be ready
+      window.addEventListener('load', () => {
+        const checkPhantom = setInterval(() => {
+          if (window?.solana?.isPhantom) {
+            console.log('Phantom is ready');
+            clearInterval(checkPhantom);
+          }
+        }, 100);
+        
+        setTimeout(() => clearInterval(checkPhantom), 5000);
+      });
+    </script>
+
+    <script>
+  // Force Phantom provider injection
+  (function() {
+    let attempts = 0;
+    const maxAttempts = 20;
+    
+    function checkPhantom() {
+      attempts++;
+      if (window.solana?.isPhantom) {
+        console.log("✅ Phantom detected after", attempts, "attempts");
+        window.phantom = { solana: window.solana };
+        return;
+      }
+      
+      if (attempts < maxAttempts) {
+        setTimeout(checkPhantom, 500);
+      } else {
+        console.error("❌ Phantom not detected after", maxAttempts, "attempts");
+      }
+    }
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', checkPhantom);
+    } else {
+      checkPhantom();
+    }
+  })();
+</script>
 </head>
 
   <body>
