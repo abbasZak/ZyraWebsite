@@ -11,17 +11,21 @@ import {
   Menu,
   X,
   HelpCircle,
+  Minus,
+  Plus
 } from "lucide-react";
 import SimpleWalletButton from "./SimpleWalletButton";
 import OnboardingTour, { useOnboardingTour } from "./OnboardingTour";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useWallet } from "@solana/wallet-adapter-react";
-import zyraLogo from "@/assets/zyra-logo.png";
+import zyraLogo from "../../images/zyra-logo.jpeg";
 
 const navItems = [
   { label: "Swap", href: "/dex", icon: ArrowLeftRight, tourId: "swap" },
+  { label: "Jupiter", href: "/dex/jupiter", icon: ArrowLeftRight, tourId: "jupiter" },
   { label: "Trade", href: "/dex/trade", icon: BarChart3, tourId: "trade" },
-  { label: "Liquidity", href: "/dex/liquidity", icon: Droplets, tourId: "liquidity" },
+  { label: "Add Liquidity", href: "/dex/liquidity", icon: Plus, tourId: "add-liquidity" },
+  { label: "Remove", href: "/dex/remove-liquidity", icon: Minus, tourId: "remove" },
   { label: "Staking", href: "/dex/staking", icon: Coins, tourId: "staking" },
   { label: "Governance", href: "/dex/governance", icon: Vote, tourId: "governance" },
   { label: "AI", href: "/dex/ai", icon: Brain, tourId: "ai" },

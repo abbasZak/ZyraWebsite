@@ -8,8 +8,28 @@ import { useNavigate } from "react-router-dom";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction, PublicKey } from "@solana/web3.js";
 
-// Token list with mint addresses and real-time prices from Coingecko (via API)
-const TOKENS: Token[] = [
+interface Token {
+  symbol: string;
+  name: string;
+  icon: string;
+  mint: string;
+  decimals: number;
+  logoURI?: string;
+}
+
+type SwapState = "idle" | "quoting" | "quoted" | "swapping" | "success" | "error";
+
+// Your custom token that stays in the list
+const CUSTOM_TOKENS: Token[] = [
+  { symbol: "$ZYRA", name: "ZYRA", icon: "💲", mint: "3Jz9qH8kB8EyJJu8W1Mj5AS4GX54xJFfcnNNuWZ35bZE", decimals: 9 },
+];
+
+// Priority tokens that should always appear first
+const PRIORITY_SYMBOLS = ["$ZYRA", "SOL", "USDC", "USDT", "JUP", "RAY", "BONK", "ORCA", "WIF"];
+
+// Fallback tokens in case API fails
+const FALLBACK_TOKENS: Token[] = [
+  { symbol: "$ZYRA", name: "ZYRA", icon: "💲", mint: "3Jz9qH8kB8EyJJu8W1Mj5AS4GX54xJFfcnNNuWZ35bZE", decimals: 9 },
   { symbol: "SOL", name: "Solana", icon: "◎", mint: "So11111111111111111111111111111111111111112", decimals: 9 },
   { symbol: "USDC", name: "USD Coin", icon: "💲", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6 },
   { symbol: "USDT", name: "Tether", icon: "💵", mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", decimals: 6 },
@@ -18,20 +38,49 @@ const TOKENS: Token[] = [
   { symbol: "RAY", name: "Raydium", icon: "☀️", mint: "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R", decimals: 6 },
 ];
 
-interface Token {
-  symbol: string;
-  name: string;
-  icon: string;
-  mint: string;
-  decimals: number;
-}
+const getFallbackIcon = (symbol: string): string => {
+  const icons: Record<string, string> = {
+    'SOL': '◎', 'USDC': '💲', 'USDT': '💵', 'BONK': '🦴',
+    'JUP': '🪐', 'RAY': '☀️', 'ORCA': '🐋', 'WIF': '🎩'
+  };
+  return icons[symbol] || '🪙';
+};
 
-type SwapState = "idle" | "quoting" | "quoted" | "swapping" | "success" | "error";
+// Optimize token list for performance
+const optimizeTokenList = (tokens: Token[]): Token[] => {
+  // Separate priority tokens
+  const priorityTokens = tokens.filter(t => PRIORITY_SYMBOLS.includes(t.symbol));
+  
+  // Filter for tokens with reasonable market presence
+  const otherTokens = tokens.filter(t => 
+    !PRIORITY_SYMBOLS.includes(t.symbol) && 
+    (t.logoURI || t.symbol.length <= 6)
+  );
+  
+  // Limit to 150 other tokens for performance
+  const limitedOthers = otherTokens.slice(0, 150);
+  
+  // Combine and remove duplicates
+  const combined = [...priorityTokens, ...limitedOthers];
+  const unique = combined.filter((token, index, self) => 
+    index === self.findIndex(t => t.mint === token.mint)
+  );
+  
+  // Sort priority tokens first, then alphabetically
+  return unique.sort((a, b) => {
+    const aIsPriority = PRIORITY_SYMBOLS.includes(a.symbol);
+    const bIsPriority = PRIORITY_SYMBOLS.includes(b.symbol);
+    if (aIsPriority && !bIsPriority) return -1;
+    if (!aIsPriority && bIsPriority) return 1;
+    return a.symbol.localeCompare(b.symbol);
+  });
+};
 
 const Swap = () => {
-  const [tokens] = useState<Token[]>(TOKENS);
-  const [fromToken, setFromToken] = useState<Token | null>(TOKENS[0]);
-  const [toToken, setToToken] = useState<Token | null>(TOKENS[1]);
+  const [tokens, setTokens] = useState<Token[]>(FALLBACK_TOKENS);
+  const [isLoadingTokens, setIsLoadingTokens] = useState(true);
+  const [fromToken, setFromToken] = useState<Token | null>(null);
+  const [toToken, setToToken] = useState<Token | null>(null);
   const [fromAmount, setFromAmount] = useState("");
   const [slippage, setSlippage] = useState(0.5);
   const [swapState, setSwapState] = useState<SwapState>("idle");
@@ -54,28 +103,123 @@ const Swap = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
 
-  // Fetch real token prices from Coingecko (no CORS issues)
+  // Fetch tokens from multiple endpoints
+  useEffect(() => {
+    const fetchTokens = async () => {
+      setIsLoadingTokens(true);
+      
+      const endpoints = [
+        "https://raw.githubusercontent.com/solana-labs/token-list/main/src/tokens/solana.tokenlist.json",
+        "https://cdn.jsdelivr.net/gh/solana-labs/token-list@main/src/tokens/solana.tokenlist.json",
+      ];
+      
+      for (const endpoint of endpoints) {
+        try {
+          console.log("Trying endpoint:", endpoint);
+          const response = await fetch(endpoint, {
+            mode: 'cors',
+            headers: {
+              'Accept': 'application/json',
+            }
+          });
+          
+          if (response.ok) {
+            const data = await response.json();
+            
+            // Handle different response formats
+            let tokensArray = [];
+            if (Array.isArray(data)) {
+              tokensArray = data;
+            } else if (data.tokens) {
+              tokensArray = data.tokens;
+            } else {
+              tokensArray = [];
+            }
+            
+            const jupiterTokens: Token[] = tokensArray.map((token: any) => ({
+              symbol: token.symbol,
+              name: token.name,
+              icon: token.logoURI || getFallbackIcon(token.symbol),
+              mint: token.address || token.mint,
+              decimals: token.decimals,
+              logoURI: token.logoURI,
+            }));
+            
+            // Optimize token list for performance
+            const optimizedTokens = optimizeTokenList(jupiterTokens);
+            const allTokens = [...CUSTOM_TOKENS, ...optimizedTokens];
+            
+            // Remove duplicates
+            const uniqueTokens = allTokens.filter((token, index, self) => 
+              index === self.findIndex(t => t.mint === token.mint)
+            );
+            
+            setTokens(uniqueTokens);
+            
+            const zyraToken = uniqueTokens.find(t => t.symbol === "$ZYRA");
+            const solToken = uniqueTokens.find(t => t.symbol === "SOL");
+            if (zyraToken) setFromToken(zyraToken);
+            if (solToken) setToToken(solToken);
+            
+            console.log(`✅ Loaded ${uniqueTokens.length} tokens from ${endpoint}`);
+            setIsLoadingTokens(false);
+            return;
+          }
+        } catch (error) {
+          console.log(`Failed to fetch from ${endpoint}:`, error);
+        }
+      }
+      
+      // If all endpoints fail, use fallback
+      console.log("All endpoints failed, using fallback tokens");
+      setTokens(FALLBACK_TOKENS);
+      const zyraToken = FALLBACK_TOKENS.find(t => t.symbol === "$ZYRA");
+      const solToken = FALLBACK_TOKENS.find(t => t.symbol === "SOL");
+      if (zyraToken) setFromToken(zyraToken);
+      if (solToken) setToToken(solToken);
+      
+      toast({
+        title: "Using Fallback Tokens",
+        description: "Could not fetch latest token list. Using local list.",
+        variant: "destructive",
+      });
+      setIsLoadingTokens(false);
+    };
+    
+    fetchTokens();
+  }, [toast]);
+
+  // Fetch real token prices from Coingecko with fallback
   useEffect(() => {
     const fetchPrices = async () => {
       setIsLoadingPrices(true);
       try {
-        // Using Coingecko API which has CORS enabled
-        const response = await fetch(
-          'https://api.coingecko.com/api/v3/simple/price?ids=solana,usd-coin,tether,bonk,jupiter,raydium&vs_currencies=usd'
-        );
+        // Try multiple price endpoints
+        const priceEndpoints = [
+          `https://api.coingecko.com/api/v3/simple/price?ids=solana,usd-coin,tether,bonk,jupiter,raydium&vs_currencies=usd`,
+          `https://api.coingecko.com/api/v3/simple/price?ids=solana,usd-coin,tether&vs_currencies=usd`
+        ];
         
-        if (response.ok) {
-          const data = await response.json();
-          const newPrices = {
-            SOL: data.solana?.usd || tokenPrices.SOL,
-            USDC: data['usd-coin']?.usd || 1,
-            USDT: data.tether?.usd || 1,
-            BONK: data.bonk?.usd || tokenPrices.BONK,
-            JUP: data.jupiter?.usd || tokenPrices.JUP,
-            RAY: data.raydium?.usd || tokenPrices.RAY,
-          };
-          setTokenPrices(newPrices);
-          console.log("Prices updated:", newPrices);
+        for (const endpoint of priceEndpoints) {
+          try {
+            const response = await fetch(endpoint);
+            if (response.ok) {
+              const data = await response.json();
+              const newPrices = {
+                SOL: data.solana?.usd || tokenPrices.SOL,
+                USDC: data['usd-coin']?.usd || 1,
+                USDT: data.tether?.usd || 1,
+                BONK: data.bonk?.usd || tokenPrices.BONK,
+                JUP: data.jupiter?.usd || tokenPrices.JUP,
+                RAY: data.raydium?.usd || tokenPrices.RAY,
+              };
+              setTokenPrices(newPrices);
+              console.log("Prices updated:", newPrices);
+              break;
+            }
+          } catch (e) {
+            console.log("Price endpoint failed, trying next");
+          }
         }
       } catch (error) {
         console.error("Failed to fetch prices:", error);
@@ -86,7 +230,6 @@ const Swap = () => {
     };
     
     fetchPrices();
-    // Update prices every 60 seconds
     const interval = setInterval(fetchPrices, 60000);
     return () => clearInterval(interval);
   }, []);
@@ -125,7 +268,7 @@ const Swap = () => {
     return toAmount.toFixed(to.decimals <= 6 ? 6 : 4);
   };
 
-  // Fetch quote (using real prices for calculation)
+  // Fetch quote
   const fetchQuote = useCallback(async (amount: string, from: Token | null, to: Token | null) => {
     if (!from || !to || !amount || parseFloat(amount) <= 0) {
       setOutputAmount("");
@@ -138,11 +281,9 @@ const Swap = () => {
     setSwapState("quoting");
     setErrorMsg("");
 
-    // Calculate based on real token prices
     setTimeout(() => {
       const outAmount = calculateRealOutput(amount, from, to);
       setOutputAmount(outAmount);
-      // Estimate price impact based on amount (simplified)
       const amountNum = parseFloat(amount);
       const impact = amountNum > 10 ? 0.5 : amountNum > 5 ? 0.3 : amountNum > 1 ? 0.1 : 0.05;
       setPriceImpact(`~${impact}%`);
@@ -187,7 +328,6 @@ const Swap = () => {
     setErrorMsg("");
     
     try {
-      // Simulate transaction for demo
       await new Promise(resolve => setTimeout(resolve, 2000));
       
       setSwapState("success");
@@ -279,24 +419,46 @@ const Swap = () => {
           </div>
           
           <div className="flex-1 overflow-y-auto p-2">
-            {filteredTokens.map((token) => (
-              <button
-                key={token.mint}
-                onClick={() => handleSelect(token)}
-                className="w-full flex items-center gap-3 p-3 hover:bg-secondary rounded-xl transition-colors"
-              >
-                <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-xl">
-                  {token.icon}
-                </div>
-                <div className="flex-1 text-left">
-                  <div className="font-semibold">{token.symbol}</div>
-                  <div className="text-xs text-muted-foreground">{token.name}</div>
-                </div>
-                <div className="text-right text-xs text-muted-foreground">
-                  ${getTokenPrice(token.symbol).toLocaleString(undefined, { maximumFractionDigits: 6 })}
-                </div>
-              </button>
-            ))}
+            {isLoadingTokens ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : filteredTokens.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No tokens found
+              </div>
+            ) : (
+              filteredTokens.map((token) => (
+                <button
+                  key={token.mint}
+                  onClick={() => handleSelect(token)}
+                  className="w-full flex items-center gap-3 p-3 hover:bg-secondary rounded-xl transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-xl">
+                    {token.logoURI ? (
+                      <img 
+                        src={token.logoURI} 
+                        alt={token.symbol} 
+                        className="w-6 h-6 rounded-full" 
+                        loading="lazy"
+                        onError={(e) => {
+                          (e.target as HTMLImageElement).style.display = 'none';
+                        }} 
+                      />
+                    ) : (
+                      token.icon
+                    )}
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-semibold">{token.symbol}</div>
+                    <div className="text-xs text-muted-foreground">{token.name}</div>
+                  </div>
+                  <div className="text-right text-xs text-muted-foreground">
+                    ${getTokenPrice(token.symbol).toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                  </div>
+                </button>
+              ))
+            )}
           </div>
         </div>
       </div>
@@ -363,7 +525,11 @@ const Swap = () => {
                   onClick={() => setShowTokenSelect("from")}
                   className="flex items-center gap-2 bg-secondary hover:bg-secondary/80 transition-colors px-3 py-1.5 rounded-full font-semibold text-sm"
                 >
-                  <span className="text-lg">{fromToken.icon}</span>
+                  {fromToken.logoURI ? (
+                    <img src={fromToken.logoURI} alt={fromToken.symbol} className="w-5 h-5 rounded-full" />
+                  ) : (
+                    <span className="text-lg">{fromToken.icon}</span>
+                  )}
                   {fromToken.symbol}
                 </button>
               </div>
@@ -404,7 +570,11 @@ const Swap = () => {
                   onClick={() => setShowTokenSelect("to")}
                   className="flex items-center gap-2 bg-secondary hover:bg-secondary/80 transition-colors px-3 py-1.5 rounded-full font-semibold text-sm"
                 >
-                  <span className="text-lg">{toToken.icon}</span>
+                  {toToken.logoURI ? (
+                    <img src={toToken.logoURI} alt={toToken.symbol} className="w-5 h-5 rounded-full" />
+                  ) : (
+                    <span className="text-lg">{toToken.icon}</span>
+                  )}
                   {toToken.symbol}
                 </button>
               </div>

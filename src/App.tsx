@@ -15,22 +15,19 @@ import Whitepaper from "./pages/Whitepaper.tsx";
 import NotFound from "./pages/NotFound.tsx";
 import Swap from "./pages/dex/Swap.tsx";
 import Trade from "./pages/dex/Trade.tsx";
-import Liquidity from "./pages/dex/Liquidity.tsx";
+import AddLiquidity from "./pages/dex/AddLiquidity.tsx";  
+import RemoveLiquidity from "./pages/dex/RemoveLiquidity.tsx";
 import Staking from "./pages/dex/Staking.tsx";
 import AIHub from "./pages/dex/AIHub.tsx";
 import Governance from "./pages/dex/Governance.tsx";
 import AuthPage from "./components/auth/AuthPage.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
+import JupiterSwap from "./pages/dex/JupiterSwap.tsx";
 
-import "@solana/wallet-adapter-react-ui/styles.css";
+// import "@solana/wallet-adapter-react-ui/styles.css";
 
 const queryClient = new QueryClient();
-
-// Use a more reliable RPC endpoint with higher rate limits
-const SOLANA_RPC_ENDPOINT = "https://solana-api.projectserum.com";
-// Alternative endpoints if needed:
-// "https://rpc.ankr.com/solana"
-// "https://solana.publicnode.com"
+const SOLANA_RPC_ENDPOINT = "https://api.mainnet-beta.solana.com";
 
 const App = () => {
   const wallets = useMemo(
@@ -59,11 +56,13 @@ const App = () => {
                     <Route path="/reset-password" element={<ResetPassword />} />
                     <Route path="/dex" element={<Swap />} />
                     <Route path="/dex/trade" element={<Trade />} />
-                    <Route path="/dex/liquidity" element={<Liquidity />} />
+                    <Route path="/dex/liquidity" element={<AddLiquidity />} />  
+                    <Route path="/dex/remove-liquidity" element={<RemoveLiquidity />} />
                     <Route path="/dex/staking" element={<Staking />} />
                     <Route path="/dex/governance" element={<Governance />} />
                     <Route path="/dex/ai" element={<AIHub />} />
                     <Route path="*" element={<NotFound />} />
+                    <Route path="/dex/jupiter" element={<JupiterSwap />} />
                   </Routes>
                 </AuthProvider>
               </BrowserRouter>
