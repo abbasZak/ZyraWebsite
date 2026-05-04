@@ -5,30 +5,23 @@ import DexLayout from "@/components/dex/DexLayout";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useDexWalletConnect } from "@/components/dex/DexWalletConnectProvider";
 
-/* ── Token registry ────────────────────────────────────── */
-const TOKENS: Record<string, { symbol: string; mint: string; decimals: number; icon: string; cgId?: string }> = {
-  ZRA:  { symbol: "ZRA",  mint: "3Jz9qH8kB8EyJJu8W1Mj5AS4GX54xJFfcnNNuWZ35bZE", decimals: 9, icon: "💎" },
-  SOL:  { symbol: "SOL",  mint: "So11111111111111111111111111111111111111112", decimals: 9, icon: "◎", cgId: "solana" },
-  USDC: { symbol: "USDC", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6, icon: "💲", cgId: "usd-coin" },
-  USDT: { symbol: "USDT", mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", decimals: 6, icon: "💵", cgId: "tether" },
-  BONK: { symbol: "BONK", mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", decimals: 5, icon: "🦴", cgId: "bonk" },
-  RAY:  { symbol: "RAY",  mint: "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R", decimals: 6, icon: "☀️",  cgId: "raydium" },
-};
+/* ── Token interface ────────────────────────────────────── */
+interface Token {
+  symbol: string;
+  name: string;
+  mint: string;
+  decimals: number;
+  icon: string;
+  logoURI?: string;
+  cgId?: string;
+  price?: number;
+}
 
-const POOL_PAIRS = [
-  { a: "ZRA", b: "USDC" },
-  { a: "ZRA", b: "SOL" },
-  { a: "SOL", b: "USDC" },
-  { a: "SOL", b: "USDT" },
-  { a: "SOL", b: "BONK" },
-  { a: "SOL", b: "RAY" },
-];
-
-/* ── Types ─────────────────────────────────────────────── */
+/* ── Pool interface ────────────────────────────────────── */
 interface LivePool {
   pair: string;
   tokenA: string;
@@ -40,6 +33,8 @@ interface LivePool {
   priceB: number;
   iconA: string;
   iconB: string;
+  logoA?: string;
+  logoB?: string;
 }
 
 interface UserPosition {
@@ -51,17 +46,28 @@ interface UserPosition {
   pool_share: number;
 }
 
-/* ── Per-pool form state ── */
 interface PoolFormState {
   amountA: string;
   amountB: string;
 }
 
-/* ── Helpers ───────────────────────────────────────────── */
 const fmt = (n: number, prefix = "$") => {
   if (n >= 1_000_000) return `${prefix}${(n / 1_000_000).toFixed(2)}M`;
   if (n >= 1_000) return `${prefix}${(n / 1_000).toFixed(1)}K`;
   return `${prefix}${n.toFixed(2)}`;
+};
+
+// Your custom token that stays in the list
+const CUSTOM_TOKENS: Token[] = [
+  { symbol: "ZRA", name: "Zyra Token", mint: "3Jz9qH8kB8EyJJu8W1Mj5AS4GX54xJFfcnNNuWZ35bZE", decimals: 9, icon: "💎", cgId: "" },
+];
+
+const getFallbackIcon = (symbol: string): string => {
+  const icons: Record<string, string> = {
+    'SOL': '◎', 'USDC': '💲', 'USDT': '💵', 'BONK': '🦴',
+    'JUP': '🪐', 'RAY': '☀️', 'ORCA': '🐋', 'WIF': '🎩'
+  };
+  return icons[symbol] || '🪙';
 };
 
 /* ── AI Liquidity Advisor Widget ── */
@@ -175,8 +181,10 @@ const AILiquidityAdvisor = () => {
   );
 };
 
-/* ── Component ─────────────────────────────────────────── */
+/* ── Main Component ── */
 const Liquidity = () => {
+  const [tokens, setTokens] = useState<Token[]>([]);
+  const [isLoadingTokens, setIsLoadingTokens] = useState(true);
   const [pools, setPools] = useState<LivePool[]>([]);
   const [positions, setPositions] = useState<UserPosition[]>([]);
   const [loading, setLoading] = useState(true);
@@ -190,8 +198,12 @@ const Liquidity = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { connected } = useWallet();
+  const { setVisible } = useWalletModal();
   const { toast } = useToast();
-  const { openWalletConnect } = useDexWalletConnect();
+
+  const handleWalletConnect = () => {
+    setVisible(true);
+  };
 
   const getFormState = (pair: string): PoolFormState => formStates[pair] || { amountA: "", amountB: "" };
   
@@ -202,19 +214,100 @@ const Liquidity = () => {
     }));
   };
 
-  /* ── Fetch live prices from CoinGecko ────────────────── */
+  // Fetch tokens from Jupiter API
+  useEffect(() => {
+    const fetchTokens = async () => {
+      setIsLoadingTokens(true);
+      try {
+        const response = await fetch("https://raw.githubusercontent.com/solana-labs/token-list/main/src/tokens/solana.tokenlist.json");
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Transform tokens to your format
+          const jupiterTokens: Token[] = data.tokens.map((token: any) => ({
+            symbol: token.symbol,
+            name: token.name,
+            mint: token.address,
+            decimals: token.decimals,
+            icon: token.logoURI || getFallbackIcon(token.symbol),
+            logoURI: token.logoURI,
+            cgId: token.extensions?.coingeckoId || "",
+          }));
+          
+          // Filter for significant tokens (by market cap proxies)
+          const significantSymbols = ["SOL", "USDC", "USDT", "BONK", "JUP", "RAY", "ORCA", "WIF", "PYTH", "RENDER", "HNT"];
+          const filteredTokens = jupiterTokens.filter(t => 
+            significantSymbols.includes(t.symbol) || t.symbol === "ZRA"
+          );
+          
+          // Add custom token
+          const allTokens = [...CUSTOM_TOKENS, ...filteredTokens];
+          
+          // Remove duplicates
+          const uniqueTokens = allTokens.filter((token, index, self) => 
+            index === self.findIndex(t => t.mint === token.mint)
+          );
+          
+          // Sort alphabetically
+          uniqueTokens.sort((a, b) => a.symbol.localeCompare(b.symbol));
+          
+          setTokens(uniqueTokens);
+          console.log(`Loaded ${uniqueTokens.length} tokens`);
+        } else {
+          throw new Error("Failed to fetch tokens");
+        }
+      } catch (error) {
+        console.error("Failed to fetch tokens:", error);
+        // Use fallback tokens
+        const fallbackTokens: Token[] = [
+          { symbol: "ZRA", name: "Zyra Token", mint: "3Jz9qH8kB8EyJJu8W1Mj5AS4GX54xJFfcnNNuWZ35bZE", decimals: 9, icon: "💎" },
+          { symbol: "SOL", name: "Solana", mint: "So11111111111111111111111111111111111111112", decimals: 9, icon: "◎", cgId: "solana" },
+          { symbol: "USDC", name: "USD Coin", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6, icon: "💲", cgId: "usd-coin" },
+          { symbol: "USDT", name: "Tether", mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", decimals: 6, icon: "💵", cgId: "tether" },
+          { symbol: "BONK", name: "Bonk", mint: "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263", decimals: 5, icon: "🦴", cgId: "bonk" },
+          { symbol: "RAY", name: "Raydium", mint: "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R", decimals: 6, icon: "☀️", cgId: "raydium" },
+        ];
+        setTokens(fallbackTokens);
+      } finally {
+        setIsLoadingTokens(false);
+      }
+    };
+    
+    fetchTokens();
+  }, []);
+
+  // Generate pool pairs from available tokens
+  const getPoolPairs = useCallback(() => {
+    const pairs: { a: string; b: string }[] = [];
+    const zraToken = tokens.find(t => t.symbol === "ZRA");
+    const solToken = tokens.find(t => t.symbol === "SOL");
+    const usdcToken = tokens.find(t => t.symbol === "USDC");
+    const usdtToken = tokens.find(t => t.symbol === "USDT");
+    const bonkToken = tokens.find(t => t.symbol === "BONK");
+    const rayToken = tokens.find(t => t.symbol === "RAY");
+    
+    if (zraToken && usdcToken) pairs.push({ a: "ZRA", b: "USDC" });
+    if (zraToken && solToken) pairs.push({ a: "ZRA", b: "SOL" });
+    if (solToken && usdcToken) pairs.push({ a: "SOL", b: "USDC" });
+    if (solToken && usdtToken) pairs.push({ a: "SOL", b: "USDT" });
+    if (solToken && bonkToken) pairs.push({ a: "SOL", b: "BONK" });
+    if (solToken && rayToken) pairs.push({ a: "SOL", b: "RAY" });
+    
+    return pairs;
+  }, [tokens]);
+
+  /* ── Fetch live prices from CoinGecko ── */
   const fetchPrices = useCallback(async (): Promise<Record<string, number>> => {
-    const ids = Object.values(TOKENS)
-      .filter((t) => t.cgId)
-      .map((t) => t.cgId)
-      .join(",");
+    const tokenList = tokens.filter(t => t.cgId).map(t => t.cgId).join(",");
+    if (!tokenList) return {};
+    
     try {
       const res = await fetch(
-        `https://api.coingecko.com/api/v3/simple/price?ids=${ids}&vs_currency=usd`
+        `https://api.coingecko.com/api/v3/simple/price?ids=${tokenList}&vs_currencies=usd`
       );
       const data = await res.json();
       const prices: Record<string, number> = {};
-      for (const t of Object.values(TOKENS)) {
+      for (const t of tokens) {
         if (t.cgId && data[t.cgId]) {
           prices[t.symbol] = data[t.cgId].usd;
         }
@@ -226,18 +319,21 @@ const Liquidity = () => {
     } catch {
       return { SOL: 170, USDC: 1, USDT: 1, BONK: 0.000015, RAY: 2.5, ZRA: 0.045 };
     }
-  }, []);
+  }, [tokens]);
 
-  /* ── Fetch pool data from Raydium API ────────────────── */
+  /* ── Fetch pool data from Raydium API ── */
   const fetchPoolData = useCallback(async () => {
+    if (tokens.length === 0) return;
     setRefreshing(true);
     try {
       const prices = await fetchPrices();
+      const poolPairs = getPoolPairs();
       const raydiumPools: LivePool[] = [];
 
-      for (const pair of POOL_PAIRS) {
-        const tA = TOKENS[pair.a];
-        const tB = TOKENS[pair.b];
+      for (const pair of poolPairs) {
+        const tA = tokens.find(t => t.symbol === pair.a);
+        const tB = tokens.find(t => t.symbol === pair.b);
+        if (!tA || !tB) continue;
         
         // ZRA pools are simulated
         if (pair.a === "ZRA" || pair.b === "ZRA") {
@@ -255,6 +351,8 @@ const Liquidity = () => {
             priceB: prices[pair.b] || 0,
             iconA: tA.icon,
             iconB: tB.icon,
+            logoA: tA.logoURI,
+            logoB: tB.logoURI,
           });
           continue;
         }
@@ -277,6 +375,8 @@ const Liquidity = () => {
             priceB: prices[pair.b] || 0,
             iconA: tA.icon,
             iconB: tB.icon,
+            logoA: tA.logoURI,
+            logoB: tB.logoURI,
           });
         } catch {
           raydiumPools.push({
@@ -290,6 +390,8 @@ const Liquidity = () => {
             priceB: prices[pair.b] || 0,
             iconA: tA.icon,
             iconB: tB.icon,
+            logoA: tA.logoURI,
+            logoB: tB.logoURI,
           });
         }
       }
@@ -301,7 +403,7 @@ const Liquidity = () => {
       setLoading(false);
       setRefreshing(false);
     }
-  }, [fetchPrices]);
+  }, [tokens, fetchPrices, getPoolPairs]);
 
   /* ── Auto-calculate paired amount based on pool ratio ── */
   const handleAmountAChange = (val: string, pool: LivePool) => {
@@ -324,12 +426,14 @@ const Liquidity = () => {
     }
   };
 
-  /* ── Fetch on mount ────────────────────────────────────── */
+  /* ── Fetch on mount ── */
   useEffect(() => {
-    fetchPoolData();
-    const interval = setInterval(fetchPoolData, 60_000);
-    return () => clearInterval(interval);
-  }, [fetchPoolData]);
+    if (tokens.length > 0) {
+      fetchPoolData();
+      const interval = setInterval(fetchPoolData, 60_000);
+      return () => clearInterval(interval);
+    }
+  }, [tokens, fetchPoolData]);
 
   useEffect(() => {
     if (!user) return;
@@ -343,7 +447,7 @@ const Liquidity = () => {
     fetchPositions();
   }, [user]);
 
-  /* ── Add liquidity ───────────────────────────────────── */
+  /* ── Add liquidity ── */
   const handleAddLiquidity = async (pool: LivePool) => {
     if (!user || !connected) return;
     const form = getFormState(pool.pair);
@@ -391,7 +495,7 @@ const Liquidity = () => {
     }
   };
 
-  /* ── Remove liquidity ────────────────────────────────── */
+  /* ── Remove liquidity ── */
   const handleRemoveLiquidity = async (posId: string) => {
     if (!user) return;
     setRemovingId(posId);
@@ -410,7 +514,7 @@ const Liquidity = () => {
     setRemovingId(null);
   };
 
-  /* ── Calculate user's liquidity value in USD ─────────── */
+  /* ── Calculate user's liquidity value in USD ── */
   const getUserLiquidityUsd = (pair: string) => {
     const pos = positions.filter((p) => p.pair === pair);
     if (!pos.length) return 0;
@@ -422,7 +526,7 @@ const Liquidity = () => {
     );
   };
 
-  /* ── Aggregate stats ─────────────────────────────────── */
+  /* ── Aggregate stats ── */
   const totalTvl = pools.reduce((s, p) => s + p.tvl, 0);
   const totalVolume = pools.reduce((s, p) => s + p.volume24h, 0);
   const totalUserLiquidity = pools.reduce((s, p) => s + getUserLiquidityUsd(p.pair), 0);
@@ -433,6 +537,16 @@ const Liquidity = () => {
     if (filter === "sol") return (p.tokenA === "SOL" || p.tokenB === "SOL") && p.tokenA !== "ZRA" && p.tokenB !== "ZRA";
     return true;
   });
+
+  if (isLoadingTokens && tokens.length === 0) {
+    return (
+      <DexLayout>
+        <div className="flex items-center justify-center min-h-[calc(100vh-3.5rem)]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </DexLayout>
+    );
+  }
 
   return (
     <DexLayout>
@@ -454,7 +568,7 @@ const Liquidity = () => {
             variant="outline"
             size="sm"
             className="text-xs rounded-xl gap-1.5"
-            onClick={fetchPoolData}
+            onClick={() => fetchPoolData()}
             disabled={refreshing}
           >
             <RefreshCw className={`w-3 h-3 ${refreshing ? "animate-spin" : ""}`} />
@@ -564,9 +678,17 @@ const Liquidity = () => {
                   <div className="p-4">
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                       <div className="flex items-center gap-3">
-                        <div className="flex -space-x-1 text-lg">
-                          <span className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-sm">{pool.iconA}</span>
-                          <span className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-sm -ml-2 border-2 border-background">{pool.iconB}</span>
+                        <div className="flex -space-x-1">
+                          {pool.logoA ? (
+                            <img src={pool.logoA} alt={pool.tokenA} className="w-8 h-8 rounded-full bg-secondary object-cover" />
+                          ) : (
+                            <span className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-sm">{pool.iconA}</span>
+                          )}
+                          {pool.logoB ? (
+                            <img src={pool.logoB} alt={pool.tokenB} className="w-8 h-8 rounded-full bg-secondary object-cover -ml-2 border-2 border-background" />
+                          ) : (
+                            <span className="w-8 h-8 rounded-full bg-secondary flex items-center justify-center text-sm -ml-2 border-2 border-background">{pool.iconB}</span>
+                          )}
                         </div>
                         <div>
                           <div className="flex items-center gap-2">
@@ -614,7 +736,7 @@ const Liquidity = () => {
                           variant="outline"
                           size="sm"
                           className="text-xs shrink-0 border-primary/20 rounded-lg"
-                          onClick={() => openWalletConnect()}
+                          onClick={handleWalletConnect}
                         >
                           Connect Wallet
                         </Button>
@@ -641,7 +763,6 @@ const Liquidity = () => {
                   {/* Add liquidity form - per pool isolated state */}
                   {addingPool === pool.pair && (
                     <div className="border-t border-border/30 p-4 space-y-3 animate-in slide-in-from-top-2 duration-200 bg-secondary/5">
-                      {/* Price info */}
                       <div className="text-xs text-muted-foreground bg-secondary/30 rounded-lg p-2.5 flex items-center gap-2">
                         <ArrowRight className="w-3 h-3 text-primary shrink-0" />
                         1 {pool.tokenA} ≈ {pool.priceB > 0 ? (pool.priceA / pool.priceB).toFixed(
@@ -685,7 +806,6 @@ const Liquidity = () => {
                           )}
                         </div>
                       </div>
-                      {/* Summary */}
                       {form.amountA && form.amountB && parseFloat(form.amountA) > 0 && parseFloat(form.amountB) > 0 && (
                         <div className="text-xs bg-secondary/30 rounded-lg p-3 space-y-1 border border-border/20">
                           <div className="flex justify-between">

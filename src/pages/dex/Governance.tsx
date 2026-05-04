@@ -5,9 +5,9 @@ import DexLayout from "@/components/dex/DexLayout";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { useDexWalletConnect } from "@/components/dex/DexWalletConnectProvider";
 
 interface Proposal {
   id: string;
@@ -42,8 +42,8 @@ const Governance = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { connected } = useWallet();
+  const { setVisible } = useWalletModal();
   const { toast } = useToast();
-  const { openWalletConnect } = useDexWalletConnect();
 
   useEffect(() => {
     const fetchData = async () => {
@@ -74,6 +74,10 @@ const Governance = () => {
 
     return () => { supabase.removeChannel(channel); };
   }, [user]);
+
+  const handleWalletConnect = () => {
+    setVisible(true);
+  };
 
   const handleVote = async (proposalId: string, direction: "for" | "against") => {
     if (!user || !connected) return;
@@ -173,7 +177,7 @@ const Governance = () => {
               <LogIn className="w-3.5 h-3.5" /> Sign In
             </Button>
           ) : (
-            <Button size="sm" className="gap-1.5 glow-sm rounded-xl" onClick={() => openWalletConnect()}>
+            <Button size="sm" className="gap-1.5 glow-sm rounded-xl" onClick={handleWalletConnect}>
               Connect Wallet
             </Button>
           )}

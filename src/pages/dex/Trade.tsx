@@ -1,14 +1,14 @@
-import { useState, useEffect, useCallback, useRef, useMemo, type ReactNode } from "react";
-import { TrendingUp, TrendingDown, Loader2, LogIn, Brain, AlertTriangle, Shield, RefreshCw, Target, Sparkles } from "lucide-react";
+import { useState, useEffect, useCallback, useRef, useMemo } from "react";
+import { TrendingUp, TrendingDown, Loader2, LogIn, Brain, AlertTriangle, Shield, RefreshCw, Target, Sparkles, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import DexLayout from "@/components/dex/DexLayout";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { useToast } from "@/hooks/use-toast";
-import { useDexWalletConnect } from "@/components/dex/DexWalletConnectProvider";
-import { SystemProgram, PublicKey, Transaction } from "@solana/web3.js";
+import { SystemProgram, PublicKey, Transaction, VersionedTransaction } from "@solana/web3.js";
 import { supabase } from "@/integrations/supabase/client";
 import {
   ResponsiveContainer,
@@ -19,7 +19,6 @@ import {
   CartesianGrid,
   Tooltip,
   Cell,
-  Line,
 } from "recharts";
 
 const PLATFORM_FEE_WALLET = new PublicKey("2JgxWdxKRgzfJV3AEarCCKtQ4WNMbk52f6kBqHxYjpnJ");
@@ -47,7 +46,6 @@ interface OHLCCandle {
   high: number;
   low: number;
   close: number;
-  // For recharts bar trick: store wick as [low, high] and body as [open, close]
   body: [number, number];
   wick: [number, number];
   bullish: boolean;
@@ -135,14 +133,12 @@ const AITradeAdvisor = () => {
           </Button>
         </div>
 
-        {/* Sentiment + Recommendation */}
         <div className="flex items-center gap-2 mb-3">
           <span className={`text-sm font-bold ${sentimentColor}`}>{data.marketSentiment}</span>
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${recColor}`}>{data.recommendation}</span>
           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${riskColor}`}>Risk: {data.riskLevel}</span>
         </div>
 
-        {/* Signals */}
         {data.signals?.length > 0 && (
           <div className="space-y-1.5 mb-3">
             {data.signals.map((s: any, i: number) => (
@@ -157,7 +153,6 @@ const AITradeAdvisor = () => {
           </div>
         )}
 
-        {/* Trade Setup */}
         {data.tradeSetup && (
           <div className="bg-secondary/20 rounded-lg p-2.5 mb-3 text-[11px] space-y-1">
             <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
@@ -173,7 +168,6 @@ const AITradeAdvisor = () => {
           </div>
         )}
 
-        {/* Risk Warnings */}
         {data.riskWarnings?.length > 0 && (
           <div className="space-y-1.5">
             <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground font-bold uppercase tracking-widest">
@@ -221,14 +215,32 @@ const Trade = () => {
   const [selectedTimeframe, setSelectedTimeframe] = useState("1D");
   const [ohlcData, setOhlcData] = useState<OHLCCandle[]>([]);
   const [chartLoading, setChartLoading] = useState(true);
+  const [walletConnected, setWalletConnected] = useState(false);
 
   const { user } = useAuth();
   const navigate = useNavigate();
   const { publicKey, connected, signTransaction } = useWallet();
+  const { setVisible } = useWalletModal();
   const { connection } = useConnection();
   const { toast } = useToast();
-  const { openWalletConnect } = useDexWalletConnect();
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Listen for wallet connection
+  useEffect(() => {
+    const checkWallet = () => {
+      const solana = (window as any).solana;
+      setWalletConnected(solana?.isConnected === true || solana?.publicKey !== null);
+    };
+    checkWallet();
+    
+    const solana = (window as any).solana;
+    if (solana) {
+      solana.on('accountChanged', () => checkWallet());
+    }
+    
+    const interval = setInterval(checkWallet, 2000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Fetch live SOL price from CoinGecko
   const fetchPriceData = useCallback(async () => {
@@ -264,7 +276,6 @@ const Trade = () => {
       if (!resp.ok) throw new Error("OHLC fetch failed");
       const raw: number[][] = await resp.json();
 
-      // CoinGecko returns [timestamp, open, high, low, close]
       let candles: OHLCCandle[] = raw.map((c) => {
         const [ts, o, h, l, cl] = c;
         const bullish = cl >= o;
@@ -281,7 +292,6 @@ const Trade = () => {
         };
       });
 
-      // For 1H/4H, slice to show fewer candles
       if (tf === "1H") candles = candles.slice(-12);
       else if (tf === "4H") candles = candles.slice(-24);
 
@@ -364,8 +374,15 @@ const Trade = () => {
     }
   };
 
+  const handleConnectWallet = () => {
+    setVisible(true);
+  };
+
   const handleSubmitOrder = async () => {
-    if (!connected || !publicKey || !signTransaction) return;
+    if (!connected || !publicKey || !signTransaction) {
+      toast({ title: "Please connect your wallet first", variant: "destructive" });
+      return;
+    }
     if (!amount || parseFloat(amount) <= 0) {
       toast({ title: "Enter an amount", variant: "destructive" });
       return;
@@ -398,7 +415,6 @@ const Trade = () => {
         if (!swapResp.ok) throw new Error("Failed to build swap tx");
 
         const { swapTransaction } = await swapResp.json();
-        const { VersionedTransaction } = await import("@solana/web3.js");
         const tx = VersionedTransaction.deserialize(Buffer.from(swapTransaction, "base64"));
         const signed = await signTransaction(tx);
         const txid = await connection.sendRawTransaction(signed.serialize(), { skipPreflight: true });
@@ -436,7 +452,6 @@ const Trade = () => {
     return `$${(v / 1e3).toFixed(0)}K`;
   };
 
-  // Chart Y-axis domain
   const yDomain = useMemo(() => {
     if (!ohlcData.length) return [0, 100];
     const lows = ohlcData.map((c) => c.low);
@@ -542,7 +557,6 @@ const Trade = () => {
                     width={55}
                   />
                   <Tooltip content={<CustomCandlestickTooltip />} />
-                  {/* Wick (high-low range) as thin bar */}
                   <Bar dataKey="wick" barSize={2} isAnimationActive={false}>
                     {ohlcData.map((entry, i) => (
                       <Cell
@@ -551,7 +565,6 @@ const Trade = () => {
                       />
                     ))}
                   </Bar>
-                  {/* Body (open-close range) as wider bar */}
                   <Bar dataKey="body" barSize={8} isAnimationActive={false}>
                     {ohlcData.map((entry, i) => (
                       <Cell
@@ -566,7 +579,6 @@ const Trade = () => {
             )}
           </div>
 
-          {/* Volume bar */}
           <div className="mt-3 flex items-center gap-4 text-xs text-muted-foreground flex-wrap">
             {priceData && (
               <>
@@ -629,9 +641,9 @@ const Trade = () => {
                 <Button className="w-full h-11 font-semibold glow-sm" onClick={() => navigate("/auth")}>
                   <LogIn className="w-4 h-4 mr-2" /> Sign In to Trade
                 </Button>
-              ) : !connected ? (
-                <Button className="w-full h-11 font-semibold glow-sm" onClick={() => openWalletConnect()}>
-                  Connect Wallet
+              ) : !connected && !walletConnected ? (
+                <Button className="w-full h-11 font-semibold" onClick={handleConnectWallet}>
+                  <Wallet className="w-4 h-4 mr-2" /> Connect Wallet
                 </Button>
               ) : (
                 <Button
@@ -671,7 +683,6 @@ const Trade = () => {
           </div>
         </div>
 
-        {/* Recent trades */}
         {/* AI Trade Advisor */}
         <div className="lg:col-span-4">
           <AITradeAdvisor />

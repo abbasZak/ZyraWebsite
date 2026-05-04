@@ -1,18 +1,11 @@
 import { useState, useEffect } from "react";
-import { Plus, Loader2, AlertTriangle, Info, Wallet, LogIn } from "lucide-react";
+import { Plus, Loader2, AlertTriangle, Info, Wallet, LogIn, Search, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import DexLayout from "@/components/dex/DexLayout";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigate } from "react-router-dom";
-import { useConnection } from "@solana/wallet-adapter-react";
-
-// Token list
-const TOKENS: Token[] = [
-  { symbol: "SOL", name: "Solana", icon: "◎", mint: "So11111111111111111111111111111111111111112", decimals: 9 },
-  { symbol: "USDC", name: "USD Coin", icon: "💲", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6 },
-  { symbol: "USDT", name: "Tether", icon: "💵", mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", decimals: 6 },
-];
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 
 interface Token {
   symbol: string;
@@ -20,46 +13,129 @@ interface Token {
   icon: string;
   mint: string;
   decimals: number;
+  logoURI?: string;
+  price?: number;
 }
 
+// Your custom token that stays in the list
+const CUSTOM_TOKENS: Token[] = [
+  { symbol: "ZRA", name: "Zyra Token", icon: "💎", mint: "3Jz9qH8kB8EyJJu8W1Mj5AS4GX54xJFfcnNNuWZ35bZE", decimals: 9 },
+];
+
+// Fallback tokens in case API fails
+const FALLBACK_TOKENS: Token[] = [
+  { symbol: "SOL", name: "Solana", icon: "◎", mint: "So11111111111111111111111111111111111111112", decimals: 9 },
+  { symbol: "USDC", name: "USD Coin", icon: "💲", mint: "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v", decimals: 6 },
+  { symbol: "USDT", name: "Tether", icon: "💵", mint: "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB", decimals: 6 },
+];
+
+const getFallbackIcon = (symbol: string): string => {
+  const icons: Record<string, string> = {
+    'SOL': '◎', 'USDC': '💲', 'USDT': '💵', 'ZRA': '💎',
+    'BONK': '🦴', 'JUP': '🪐', 'RAY': '☀️', 'ORCA': '🐋', 'WIF': '🎩'
+  };
+  return icons[symbol] || '🪙';
+};
+
 const AddLiquidity = () => {
-  const [tokenA, setTokenA] = useState<Token | null>(TOKENS[0]);
-  const [tokenB, setTokenB] = useState<Token | null>(TOKENS[1]);
+  const [tokens, setTokens] = useState<Token[]>(FALLBACK_TOKENS);
+  const [isLoadingTokens, setIsLoadingTokens] = useState(true);
+  const [tokenA, setTokenA] = useState<Token | null>(null);
+  const [tokenB, setTokenB] = useState<Token | null>(null);
   const [amountA, setAmountA] = useState("");
   const [amountB, setAmountB] = useState("");
   const [slippage, setSlippage] = useState(0.5);
   const [isLoading, setIsLoading] = useState(false);
   const [priceWarning, setPriceWarning] = useState(false);
   const [walletConnected, setWalletConnected] = useState(false);
-  const [tokenPrices, setTokenPrices] = useState<Record<string, number>>({});
+  const [tokenPrices, setTokenPrices] = useState<Record<string, number>>({
+    SOL: 180, USDC: 1, USDT: 1, ZRA: 0.045
+  });
+  const [isLoadingPrices, setIsLoadingPrices] = useState(false);
+  const [showTokenSelect, setShowTokenSelect] = useState<"A" | "B" | null>(null);
+  const [tokenSearchQuery, setTokenSearchQuery] = useState("");
+
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
-  const { connection } = useConnection();
+  const { setVisible } = useWalletModal();
 
-  // Fetch token prices
+  const handleWalletConnect = () => {
+    setVisible(true);
+  };
+
+  // Fetch tokens from Jupiter API
   useEffect(() => {
-    const fetchPrices = async () => {
-      try {
-        const response = await fetch(
-          'https://api.coingecko.com/api/v3/simple/price?ids=solana,usd-coin,tether&vs_currencies=usd'
+  const fetchTokens = async () => {
+    setIsLoadingTokens(true);
+    try {
+      const response = await fetch("https://raw.githubusercontent.com/solana-labs/token-list/main/src/tokens/solana.tokenlist.json");
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Transform tokens to your format
+        const jupiterTokens: Token[] = data.tokens.map((token: any) => ({
+          symbol: token.symbol,
+          name: token.name,
+          mint: token.address,
+          decimals: token.decimals,
+          icon: token.logoURI || getFallbackIcon(token.symbol),
+          logoURI: token.logoURI,
+        }));
+        
+        // Get custom token first
+        const customTokens: Token[] = [...CUSTOM_TOKENS];
+        
+        // Filter for significant tokens (including ZRA from custom list)
+        const significantSymbols = ["SOL", "USDC", "USDT", "BONK", "JUP", "RAY", "ORCA", "WIF", "PYTH", "RENDER"];
+        const filteredTokens = jupiterTokens.filter(t => 
+          significantSymbols.includes(t.symbol)
         );
-        if (response.ok) {
-          const data = await response.json();
-          setTokenPrices({
-            SOL: data.solana?.usd || 180,
-            USDC: data['usd-coin']?.usd || 1,
-            USDT: data.tether?.usd || 1,
-          });
-        }
-      } catch (error) {
-        console.error("Failed to fetch prices:", error);
+        
+        // Combine custom tokens with filtered tokens (custom tokens first to ensure they appear)
+        const allTokens = [...customTokens, ...filteredTokens];
+        
+        // Remove duplicates (if by chance ZRA exists in both)
+        const uniqueTokens = allTokens.filter((token, index, self) => 
+          index === self.findIndex(t => t.mint === token.mint)
+        );
+        
+        // Sort alphabetically
+        uniqueTokens.sort((a, b) => a.symbol.localeCompare(b.symbol));
+        
+        setTokens(uniqueTokens);
+        
+        // Set default tokens - try to find ZRA first, then SOL, then USDC
+        const zraToken = uniqueTokens.find(t => t.symbol === "ZRA");
+        const solToken = uniqueTokens.find(t => t.symbol === "SOL");
+        const usdcToken = uniqueTokens.find(t => t.symbol === "USDC");
+        
+        if (zraToken) setTokenA(zraToken);
+        if (solToken) setTokenB(solToken);
+        else if (usdcToken) setTokenB(usdcToken);
+        
+        console.log(`Loaded ${uniqueTokens.length} tokens`);
+        console.log("ZRA token found:", !!zraToken);
+      } else {
+        throw new Error("Failed to fetch tokens");
       }
-    };
-    fetchPrices();
-    const interval = setInterval(fetchPrices, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    } catch (error) {
+      console.error("Failed to fetch tokens:", error);
+      setTokens(FALLBACK_TOKENS);
+      setTokenA(FALLBACK_TOKENS[0]);
+      setTokenB(FALLBACK_TOKENS[1]);
+      toast({
+        title: "Using Fallback Tokens",
+        description: "Could not fetch latest token list. Using local list.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoadingTokens(false);
+    }
+  };
+  
+  fetchTokens();
+}, [toast]);
 
   // Check wallet connection
   useEffect(() => {
@@ -69,6 +145,35 @@ const AddLiquidity = () => {
     };
     checkWallet();
     const interval = setInterval(checkWallet, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Fetch token prices from CoinGecko
+  useEffect(() => {
+    const fetchPrices = async () => {
+      setIsLoadingPrices(true);
+      try {
+        const response = await fetch(
+          'https://api.coingecko.com/api/v3/simple/price?ids=solana,usd-coin,tether&vs_currencies=usd'
+        );
+        if (response.ok) {
+          const data = await response.json();
+          setTokenPrices(prev => ({
+            ...prev,
+            SOL: data.solana?.usd || prev.SOL,
+            USDC: data['usd-coin']?.usd || 1,
+            USDT: data.tether?.usd || 1,
+            ZRA: prev.ZRA || 0.045,
+          }));
+        }
+      } catch (error) {
+        console.error("Failed to fetch prices:", error);
+      } finally {
+        setIsLoadingPrices(false);
+      }
+    };
+    fetchPrices();
+    const interval = setInterval(fetchPrices, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -197,7 +302,105 @@ const AddLiquidity = () => {
   const usdValueB = amountB && tokenB ? (parseFloat(amountB) * getTokenPrice(tokenB.symbol)).toFixed(2) : "0";
   const sharePercentage = (parseFloat(usdValueA) + parseFloat(usdValueB)) > 0 ? "~0.01" : "0";
 
-  if (!tokenA || !tokenB) return null;
+  // Token selection modal
+  const TokenSelectModal = ({ type, onClose }: { type: "A" | "B", onClose: () => void }) => {
+    const filteredTokens = tokens.filter(t => 
+      t.symbol.toLowerCase().includes(tokenSearchQuery.toLowerCase()) ||
+      t.name.toLowerCase().includes(tokenSearchQuery.toLowerCase())
+    );
+    
+    const handleSelect = (token: Token) => {
+      if (type === "A") {
+        if (tokenB && token.mint === tokenB.mint) {
+          setTokenB(tokenA);
+        }
+        setTokenA(token);
+      } else {
+        if (tokenA && token.mint === tokenA.mint) {
+          setTokenA(tokenB);
+        }
+        setTokenB(token);
+      }
+      setTokenSearchQuery("");
+      onClose();
+      setAmountA("");
+      setAmountB("");
+    };
+    
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div className="bg-card rounded-2xl w-full max-w-md max-h-[80vh] flex flex-col border border-border">
+          <div className="p-4 border-b border-border flex justify-between items-center">
+            <h3 className="font-semibold">Select Token</h3>
+            <button onClick={onClose} className="p-1 hover:bg-secondary rounded-lg">
+              <X className="w-5 h-5" />
+            </button>
+          </div>
+          
+          <div className="p-4 border-b border-border">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <input
+                type="text"
+                placeholder="Search by name or symbol..."
+                value={tokenSearchQuery}
+                onChange={(e) => setTokenSearchQuery(e.target.value)}
+                className="w-full bg-secondary rounded-xl pl-9 pr-4 py-2 outline-none focus:ring-1 focus:ring-primary"
+                autoFocus
+              />
+            </div>
+          </div>
+          
+          <div className="flex-1 overflow-y-auto p-2">
+            {isLoadingTokens ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-primary" />
+              </div>
+            ) : filteredTokens.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No tokens found
+              </div>
+            ) : (
+              filteredTokens.map((token) => (
+                <button
+                  key={token.mint}
+                  onClick={() => handleSelect(token)}
+                  className="w-full flex items-center gap-3 p-3 hover:bg-secondary rounded-xl transition-colors"
+                >
+                  <div className="w-10 h-10 rounded-full bg-secondary flex items-center justify-center text-xl">
+                    {token.logoURI ? (
+                      <img src={token.logoURI} alt={token.symbol} className="w-6 h-6 rounded-full" onError={(e) => {
+                        (e.target as HTMLImageElement).style.display = 'none';
+                      }} />
+                    ) : (
+                      token.icon
+                    )}
+                  </div>
+                  <div className="flex-1 text-left">
+                    <div className="font-semibold">{token.symbol}</div>
+                    <div className="text-xs text-muted-foreground">{token.name}</div>
+                  </div>
+                  <div className="text-right text-xs text-muted-foreground">
+                    ${getTokenPrice(token.symbol).toLocaleString(undefined, { maximumFractionDigits: 6 })}
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  if (!tokenA || !tokenB) {
+    return (
+      <DexLayout>
+        <div className="flex items-center justify-center min-h-[calc(100vh-3.5rem)]">
+          <Loader2 className="w-8 h-8 animate-spin text-primary" />
+        </div>
+      </DexLayout>
+    );
+  }
 
   return (
     <DexLayout>
@@ -225,10 +428,17 @@ const AddLiquidity = () => {
                   onChange={(e) => handleAmountAChange(e.target.value)}
                   className="flex-1 bg-transparent text-2xl font-bold outline-none placeholder:text-muted-foreground/30 w-0"
                 />
-                <div className="flex items-center gap-2 bg-secondary hover:bg-secondary/80 px-3 py-1.5 rounded-full">
-                  <span className="text-lg">{tokenA.icon}</span>
-                  <span className="font-semibold text-sm">{tokenA.symbol}</span>
-                </div>
+                <button
+                  onClick={() => setShowTokenSelect("A")}
+                  className="flex items-center gap-2 bg-secondary hover:bg-secondary/80 transition-colors px-3 py-1.5 rounded-full font-semibold text-sm"
+                >
+                  {tokenA.logoURI ? (
+                    <img src={tokenA.logoURI} alt={tokenA.symbol} className="w-5 h-5 rounded-full" />
+                  ) : (
+                    <span className="text-lg">{tokenA.icon}</span>
+                  )}
+                  {tokenA.symbol}
+                </button>
               </div>
             </div>
 
@@ -253,10 +463,17 @@ const AddLiquidity = () => {
                   onChange={(e) => handleAmountBChange(e.target.value)}
                   className="flex-1 bg-transparent text-2xl font-bold outline-none placeholder:text-muted-foreground/30 w-0"
                 />
-                <div className="flex items-center gap-2 bg-secondary hover:bg-secondary/80 px-3 py-1.5 rounded-full">
-                  <span className="text-lg">{tokenB.icon}</span>
-                  <span className="font-semibold text-sm">{tokenB.symbol}</span>
-                </div>
+                <button
+                  onClick={() => setShowTokenSelect("B")}
+                  className="flex items-center gap-2 bg-secondary hover:bg-secondary/80 transition-colors px-3 py-1.5 rounded-full font-semibold text-sm"
+                >
+                  {tokenB.logoURI ? (
+                    <img src={tokenB.logoURI} alt={tokenB.symbol} className="w-5 h-5 rounded-full" />
+                  ) : (
+                    <span className="text-lg">{tokenB.icon}</span>
+                  )}
+                  {tokenB.symbol}
+                </button>
               </div>
             </div>
 
@@ -339,10 +556,7 @@ const AddLiquidity = () => {
               <div className="space-y-3">
                 <Button 
                   className="w-full h-12"
-                  onClick={() => {
-                    const walletBtn = document.querySelector('[data-tour="wallet"] button');
-                    if (walletBtn) (walletBtn as HTMLButtonElement).click();
-                  }}
+                  onClick={handleWalletConnect}
                 >
                   <Wallet className="w-4 h-4 mr-2" />
                   Connect Wallet to Add Liquidity
@@ -370,6 +584,10 @@ const AddLiquidity = () => {
           </div>
         </div>
       </div>
+      
+      {showTokenSelect && (
+        <TokenSelectModal type={showTokenSelect} onClose={() => setShowTokenSelect(null)} />
+      )}
     </DexLayout>
   );
 };

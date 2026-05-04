@@ -50,7 +50,7 @@
     "@solana/wallet-adapter-solflare": "^0.6.33",
     "@solana/wallet-adapter-torus": "^0.11.32",
     "@solana/web3.js": "^1.98.0",
-    "@supabase/supabase-js": "^2.103.0",
+    "@supabase/supabase-js": "^2.105.1",
     "@tanstack/react-query": "5.56.2",
     "@web3modal/react": "^2.7.1",
     "@web3modal/solana": "^5.1.11",

@@ -7,6 +7,8 @@ import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { VersionedTransaction, PublicKey } from "@solana/web3.js";
+import { SafetyCheck } from '@/components/dex/SafetyCheck';
+import { supabase } from "@/integrations/supabase/client";
 
 interface Token {
   symbol: string;
@@ -96,12 +98,17 @@ const Swap = () => {
   });
   const [isLoadingPrices, setIsLoadingPrices] = useState(false);
   
+  // REMOVED: const [userCredits, setUserCredits] = useState<number | null>(null);
+  // REMOVED: The entire loadCredits useEffect
+
   const quoteTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { connection } = useConnection();
   const { toast } = useToast();
   const { user } = useAuth();
   const navigate = useNavigate();
+
+
 
   // Fetch tokens from multiple endpoints
   useEffect(() => {
@@ -646,6 +653,19 @@ const Swap = () => {
                 ))}
               </div>
             </div>
+
+            {/* Safety Check Component */}
+            {user && toToken && (
+              <SafetyCheck
+                tokenMint={toToken.mint}
+                tokenSymbol={toToken.symbol}
+                tokenName={toToken.name}
+                onSafetyConfirmed={() => {
+                  console.log("Safety check passed, user confirmed understanding risks");
+                }}
+                userId={user?.id}
+              />
+            )}
 
             {/* CTA */}
             {!user ? (

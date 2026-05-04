@@ -5,11 +5,11 @@ import DexLayout from "@/components/dex/DexLayout";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { useNavigate } from "react-router-dom";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useConnection } from "@solana/wallet-adapter-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { getZraBalance, buildZraTransferTx } from "@/lib/zra-token";
-import { useDexWalletConnect } from "@/components/dex/DexWalletConnectProvider";
 
 const stakingTiers = [
   { duration: 30, label: "30 Days", apr: 8, minStake: 1000, lockIcon: "🔓", color: "from-emerald-500/20 to-emerald-500/5", borderColor: "border-emerald-500/20" },
@@ -40,9 +40,13 @@ const Staking = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { publicKey, connected, signTransaction } = useWallet();
+  const { setVisible } = useWalletModal();
   const { connection } = useConnection();
   const { toast } = useToast();
-  const { openWalletConnect } = useDexWalletConnect();
+
+  const handleWalletConnect = () => {
+    setVisible(true);
+  };
 
   // Fetch ZRA balance when wallet connects
   const fetchBalance = useCallback(async () => {
@@ -278,7 +282,7 @@ const Staking = () => {
                       <LogIn className="w-3.5 h-3.5 mr-1.5" /> Sign In to Stake
                     </Button>
                   ) : !connected ? (
-                    <Button className="w-full glow-sm rounded-xl h-11" onClick={() => openWalletConnect()}>
+                    <Button className="w-full glow-sm rounded-xl h-11" onClick={handleWalletConnect}>
                       Connect Wallet
                     </Button>
                   ) : (
