@@ -22,7 +22,6 @@ import AIHub from "./pages/dex/AIHub.tsx";
 import Governance from "./pages/dex/Governance.tsx";
 import AuthPage from "./components/auth/AuthPage.tsx";
 import ResetPassword from "./pages/ResetPassword.tsx";
-import JupiterSwap from "./pages/dex/JupiterSwap.tsx";
 
 // import "@solana/wallet-adapter-react-ui/styles.css";
 
@@ -62,7 +61,7 @@ const App = () => {
                     <Route path="/dex/governance" element={<Governance />} />
                     <Route path="/dex/ai" element={<AIHub />} />
                     <Route path="*" element={<NotFound />} />
-                    <Route path="/dex/jupiter" element={<JupiterSwap />} />
+                   
                   </Routes>
                 </AuthProvider>
               </BrowserRouter>

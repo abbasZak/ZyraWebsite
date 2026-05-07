@@ -22,7 +22,6 @@ import zyraLogo from "../../images/zyra-logo.jpeg";
 
 const navItems = [
   { label: "Swap", href: "/dex", icon: ArrowLeftRight, tourId: "swap" },
-  { label: "Jupiter", href: "/dex/jupiter", icon: ArrowLeftRight, tourId: "jupiter" },
   { label: "Trade", href: "/dex/trade", icon: BarChart3, tourId: "trade" },
   { label: "Add Liquidity", href: "/dex/liquidity", icon: Plus, tourId: "add-liquidity" },
   { label: "Remove", href: "/dex/remove-liquidity", icon: Minus, tourId: "remove" },
